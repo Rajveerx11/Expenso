@@ -2,8 +2,6 @@ package com.expenso.app.data.repository
 
 import com.expenso.app.data.dto.CreateGroupDto
 import com.expenso.app.data.dto.CreateGroupMemberDto
-import com.expenso.app.data.dto.CreateGroupExpenseDto
-import com.expenso.app.data.dto.CreateExpenseSplitDto
 import com.expenso.app.data.dto.GroupDto
 import com.expenso.app.data.dto.GroupMemberWithProfileDto
 import com.expenso.app.data.dto.GroupExpenseDto
@@ -24,6 +22,8 @@ import javax.inject.Inject
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.put
 
 class GroupRepositoryImpl @Inject constructor(
@@ -254,36 +254,27 @@ class GroupRepositoryImpl @Inject constructor(
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val expenseId = java.util.UUID.randomUUID().toString()
-                
-                // Insert group expense
-                postgrest["group_expenses"].insert(buildJsonObject {
-                    put("id", expenseId)
-                    put("group_id", groupId)
-                    put("paid_by", paidBy)
-                    put("title", title)
-                    put("total_amount", totalAmount)
-                    put("category", category)
-                    put("split_type", splitType)
-                    if (note != null) put("note", note)
-                    put("expense_date", expenseDate)
-                })
-                
-                // Insert splits
-                val splitJsonArray = splits.map { (userId, amount) ->
-                    buildJsonObject {
-                        put("expense_id", expenseId)
-                        put("user_id", userId)
-                        put("owed_amount", amount)
-                        put("is_settled", userId == paidBy)
+                postgrest.rpc(
+                    "create_group_expense",
+                    parameters = buildJsonObject {
+                        put("group_id_param", groupId)
+                        put("paid_by_param", paidBy)
+                        put("title_param", title)
+                        put("total_amount_param", totalAmount)
+                        put("category_param", category)
+                        put("split_type_param", splitType)
+                        put("note_param", note)
+                        put("expense_date_param", expenseDate)
+                        put("splits_param", buildJsonArray {
+                            splits.forEach { (userId, amount) ->
+                                add(buildJsonObject {
+                                    put("user_id", userId)
+                                    put("owed_amount", amount)
+                                })
+                            }
+                        })
                     }
-                }
-                
-                // Insert each split separately to avoid array serialization issues
-                splitJsonArray.forEach { splitJson ->
-                    postgrest["expense_splits"].insert(splitJson)
-                }
-                
+                )
                 true
             } catch (e: Exception) {
                 android.util.Log.e("GroupRepo", "addGroupExpense failed: ${e.message}", e)
@@ -295,9 +286,10 @@ class GroupRepositoryImpl @Inject constructor(
     override suspend fun deleteGroupExpense(expenseId: String): Boolean {
         return try {
             withContext(Dispatchers.IO) {
-                postgrest["group_expenses"].delete {
-                    filter { eq("id", expenseId) }
-                }
+                postgrest.rpc(
+                    "delete_group_expense",
+                    parameters = buildJsonObject { put("expense_id_param", expenseId) }
+                )
                 true
             }
         } catch (e: Exception) {
