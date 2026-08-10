@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expenso.app.domain.model.GroupMember
+import com.expenso.app.domain.model.SplitCalculator
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.GroupRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +16,6 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
-import kotlin.math.abs
 
 data class AddGroupExpenseUiState(
     val title: String = "",
@@ -143,74 +143,32 @@ class AddGroupExpenseViewModel @Inject constructor(
 
     fun saveExpense() {
         val state = _uiState.value
-        val amount = state.totalAmount.toDoubleOrNull() ?: 0.0
-
+        if (state.isLoading || state.isSuccess) return
         if (state.title.isBlank()) {
             _uiState.update { it.copy(error = "Title cannot be empty") }
             return
         }
-        if (amount <= 0) {
-            _uiState.update { it.copy(error = "Amount must be greater than zero") }
-            return
-        }
-
+        _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val splits = mutableListOf<Pair<String, Double>>()
-                
-                when (state.splitType) {
-                    "equal" -> {
-                        val selectedUsers = state.selectedMembersForSplit.filterValues { it }.keys
-                        if (selectedUsers.isEmpty()) {
-                            _uiState.update { it.copy(isLoading = false, error = "Select at least one member") }
-                            return@launch
-                        }
-                        val splitAmount = amount / selectedUsers.size
-                        selectedUsers.forEach { userId ->
-                            splits.add(userId to splitAmount)
-                        }
-                    }
-                    "exact" -> {
-                        var sum = 0.0
-                        state.members.forEach { member ->
-                            val exactVal = state.exactAmounts[member.userId]?.toDoubleOrNull() ?: 0.0
-                            if (exactVal > 0) {
-                                splits.add(member.userId to exactVal)
-                                sum += exactVal
-                            }
-                        }
-                        if (abs(sum - amount) > 0.01) {
-                            _uiState.update { it.copy(isLoading = false, error = "Total exact amounts do not match total amount") }
-                            return@launch
-                        }
-                    }
-                    "percentage" -> {
-                        var sumPercent = 0.0
-                        state.members.forEach { member ->
-                            val percentVal = state.percentages[member.userId]?.toDoubleOrNull() ?: 0.0
-                            if (percentVal > 0) {
-                                splits.add(member.userId to (amount * percentVal / 100.0))
-                                sumPercent += percentVal
-                            }
-                        }
-                        if (abs(sumPercent - 100.0) > 0.01) {
-                            _uiState.update { it.copy(isLoading = false, error = "Total percentages must equal 100") }
-                            return@launch
-                        }
-                    }
-                }
+                val plan = SplitCalculator.calculate(
+                    totalInput = state.totalAmount,
+                    splitType = state.splitType,
+                    selectedUsers = state.selectedMembersForSplit.filterValues { it }.keys,
+                    exactAmounts = state.exactAmounts,
+                    percentages = state.percentages
+                )
 
                 val success = groupRepository.addGroupExpense(
                     groupId = groupId,
                     paidBy = state.paidByUserId,
                     title = state.title.trim(),
-                    totalAmount = amount,
+                    totalAmount = plan.totalAmount,
                     category = state.category,
                     splitType = state.splitType,
                     note = state.note.takeIf { it.isNotBlank() },
                     expenseDate = state.expenseDate,
-                    splits = splits
+                    splits = plan.splits
                 )
 
                 if (success) {
