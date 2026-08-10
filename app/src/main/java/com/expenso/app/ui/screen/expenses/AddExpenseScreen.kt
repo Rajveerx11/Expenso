@@ -34,10 +34,11 @@ import com.expenso.app.ui.components.CategoryPicker
 import com.expenso.app.ui.components.GlassCard
 import com.expenso.app.ui.theme.*
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,7 @@ fun AddExpenseScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var showSuccessOverlay by remember { mutableStateOf(false) }
     val successScale = remember { Animatable(0f) }
 
@@ -71,7 +73,16 @@ fun AddExpenseScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(if (uiState.type == "income") "Add Income" else "Add Expense") },
+                    title = {
+                        Text(
+                            when {
+                                uiState.isLinkedGroupExpense -> "Group Transaction"
+                                uiState.isEditing -> "Edit Transaction"
+                                uiState.type == "income" -> "Add Income"
+                                else -> "Add Expense"
+                            }
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "Back")
@@ -122,7 +133,7 @@ fun AddExpenseScreen(
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(24.dp))
                             .background(if (uiState.type == "expense") RoseRed else Color.Transparent)
-                            .clickable { viewModel.updateType("expense") },
+                            .clickable(enabled = !uiState.isLinkedGroupExpense) { viewModel.updateType("expense") },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -137,7 +148,7 @@ fun AddExpenseScreen(
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(24.dp))
                             .background(if (uiState.type == "income") EmeraldGreen else Color.Transparent)
-                            .clickable { viewModel.updateType("income") },
+                            .clickable(enabled = !uiState.isLinkedGroupExpense) { viewModel.updateType("income") },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -166,6 +177,7 @@ fun AddExpenseScreen(
                         color = if (uiState.type == "income") EmeraldGreen else RoseRed
                     ),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    enabled = !uiState.isLinkedGroupExpense,
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -191,6 +203,7 @@ fun AddExpenseScreen(
                             onValueChange = { viewModel.updateTitle(it) },
                             label = { Text("Title") },
                             singleLine = true,
+                            enabled = !uiState.isLinkedGroupExpense,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = Color.White.copy(alpha = 0.5f),
@@ -204,7 +217,7 @@ fun AddExpenseScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showCategoryPicker = true }
+                                .clickable(enabled = !uiState.isLinkedGroupExpense) { showCategoryPicker = true }
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -231,6 +244,7 @@ fun AddExpenseScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clickable(enabled = !uiState.isLinkedGroupExpense) { showDatePicker = true }
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -246,14 +260,10 @@ fun AddExpenseScreen(
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text("Date", style = MaterialTheme.typography.bodySmall, color = NeutralMedium)
-                                val displayDate = try {
-                                    val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-                                    sdf.timeZone = TimeZone.getTimeZone("UTC")
-                                    val date = sdf.parse(uiState.expenseDate)
-                                    SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(date!!)
-                                } catch (e: Exception) {
-                                    "Today"
-                                }
+                                val displayDate = runCatching {
+                                    LocalDate.parse(uiState.expenseDate.substringBefore('T'))
+                                        .format(DateTimeFormatter.ofPattern("MMM dd, yyyy", Locale.getDefault()))
+                                }.getOrDefault("Today")
                                 Text(displayDate, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                             }
                         }
@@ -269,6 +279,7 @@ fun AddExpenseScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(100.dp),
+                            enabled = !uiState.isLinkedGroupExpense,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = Color.White.copy(alpha = 0.5f),
                                 unfocusedContainerColor = Color.Transparent
@@ -284,7 +295,7 @@ fun AddExpenseScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !uiState.isLoading && !uiState.isSuccess,
+                    enabled = !uiState.isLoading && !uiState.isSuccess && !uiState.isLinkedGroupExpense,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (uiState.type == "income") EmeraldGreen else DeepIndigo
                     ),
@@ -294,7 +305,11 @@ fun AddExpenseScreen(
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
                         Text(
-                            text = "Save",
+                            text = when {
+                                uiState.isLinkedGroupExpense -> "View only"
+                                uiState.isEditing -> "Update"
+                                else -> "Save"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -332,7 +347,7 @@ fun AddExpenseScreen(
         }
     }
     
-    if (showCategoryPicker) {
+    if (showCategoryPicker && !uiState.isLinkedGroupExpense) {
         ModalBottomSheet(
             onDismissRequest = { showCategoryPicker = false },
             containerColor = GlassBackground
@@ -345,6 +360,34 @@ fun AddExpenseScreen(
                 },
                 onDismiss = { showCategoryPicker = false }
             )
+        }
+    }
+
+    if (showDatePicker && !uiState.isLinkedGroupExpense) {
+        val initialMillis = runCatching {
+            LocalDate.parse(uiState.expenseDate.substringBefore('T'))
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli()
+        }.getOrNull()
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        viewModel.updateDate(
+                            Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                        )
+                    }
+                    showDatePicker = false
+                }) { Text("Select") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

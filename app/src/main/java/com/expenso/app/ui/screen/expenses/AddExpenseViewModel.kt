@@ -1,6 +1,7 @@
 package com.expenso.app.ui.screen.expenses
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.ExpenseRepository
@@ -10,10 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class AddExpenseUiState(
@@ -23,6 +21,8 @@ data class AddExpenseUiState(
     val type: String = "expense", // "income" or "expense"
     val note: String = "",
     val expenseDate: String = "",
+    val isEditing: Boolean = false,
+    val isLinkedGroupExpense: Boolean = false,
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null
@@ -30,6 +30,7 @@ data class AddExpenseUiState(
 
 @HiltViewModel
 class AddExpenseViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val expenseRepository: ExpenseRepository
 ) : ViewModel() {
@@ -37,10 +38,38 @@ class AddExpenseViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AddExpenseUiState())
     val uiState: StateFlow<AddExpenseUiState> = _uiState.asStateFlow()
 
+    private val expenseId: String? = savedStateHandle["expenseId"]
+
     init {
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-        sdf.timeZone = TimeZone.getTimeZone("UTC")
-        updateDate(sdf.format(Date()))
+        updateDate(LocalDate.now().toString())
+        expenseId?.let(::loadExpense)
+    }
+
+    private fun loadExpense(id: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val expense = expenseRepository.getPersonalExpenseById(id)
+                    ?: error("Transaction not found")
+                _uiState.update {
+                    it.copy(
+                        title = expense.title,
+                        amount = expense.amount.toString(),
+                        category = expense.category,
+                        type = expense.type,
+                        note = expense.note.orEmpty(),
+                        expenseDate = expense.expenseDate.substringBefore('T'),
+                        isEditing = true,
+                        isLinkedGroupExpense = expense.sourceGroupExpenseId != null,
+                        isLoading = false
+                    )
+                }
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(isLoading = false, error = error.message ?: "Could not load transaction")
+                }
+            }
+        }
     }
 
     fun updateTitle(title: String) {
@@ -72,6 +101,10 @@ class AddExpenseViewModel @Inject constructor(
 
     fun saveExpense() {
         val state = _uiState.value
+        if (state.isLinkedGroupExpense) {
+            _uiState.update { it.copy(error = "Group transactions must be edited from the group") }
+            return
+        }
         
         if (state.title.isBlank()) {
             _uiState.update { it.copy(error = "Title cannot be empty") }
@@ -93,15 +126,27 @@ class AddExpenseViewModel @Inject constructor(
                     return@launch
                 }
                 
-                val success = expenseRepository.addPersonalExpense(
-                    userId = userId,
-                    title = state.title.trim(),
-                    amount = amountValue,
-                    category = state.category,
-                    type = state.type,
-                    note = state.note.takeIf { it.isNotBlank() },
-                    expenseDate = state.expenseDate
-                )
+                val success = if (expenseId == null) {
+                    expenseRepository.addPersonalExpense(
+                        userId = userId,
+                        title = state.title.trim(),
+                        amount = amountValue,
+                        category = state.category,
+                        type = state.type,
+                        note = state.note.takeIf { it.isNotBlank() },
+                        expenseDate = state.expenseDate
+                    )
+                } else {
+                    expenseRepository.updatePersonalExpense(
+                        expenseId = expenseId,
+                        title = state.title.trim(),
+                        amount = amountValue,
+                        category = state.category,
+                        type = state.type,
+                        note = state.note.takeIf { it.isNotBlank() },
+                        expenseDate = state.expenseDate
+                    )
+                }
                 
                 if (success) {
                     _uiState.update { it.copy(isLoading = false, isSuccess = true) }

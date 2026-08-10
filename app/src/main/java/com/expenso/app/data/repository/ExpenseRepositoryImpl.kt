@@ -12,25 +12,32 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.time.YearMonth
+
+internal fun monthBounds(year: Int, month: Int): Pair<String, String> {
+    val start = YearMonth.of(year, month + 1).atDay(1)
+    return start.toString() to start.plusMonths(1).toString()
+}
 
 class ExpenseRepositoryImpl @Inject constructor(
     private val postgrest: Postgrest
 ) : ExpenseRepository {
 
     override suspend fun getPersonalExpenses(userId: String): List<PersonalExpense> {
-        return try {
-            withContext(Dispatchers.IO) {
-                val response = postgrest["personal_expenses"]
-                    .select {
-                        filter {
-                            eq("user_id", userId)
-                        }
-                    }
-                    .decodeList<PersonalExpenseDto>()
-                response.map { it.toDomain() }
-            }
-        } catch (e: Exception) {
-            emptyList()
+        return withContext(Dispatchers.IO) {
+            postgrest["personal_expenses"]
+                .select { filter { eq("user_id", userId) } }
+                .decodeList<PersonalExpenseDto>()
+                .map { it.toDomain() }
+        }
+    }
+
+    override suspend fun getPersonalExpenseById(expenseId: String): PersonalExpense? {
+        return withContext(Dispatchers.IO) {
+            postgrest["personal_expenses"]
+                .select { filter { eq("id", expenseId) } }
+                .decodeSingleOrNull<PersonalExpenseDto>()
+                ?.toDomain()
         }
     }
 
@@ -39,15 +46,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         year: Int,
         month: Int
     ): List<PersonalExpense> {
-        return try {
-            withContext(Dispatchers.IO) {
-                val monthOneBased = month + 1
-                val startDate = String.format("%04d-%02d-01", year, monthOneBased)
-                val endDate = if (monthOneBased == 12) {
-                    String.format("%04d-%02d-01", year + 1, 1)
-                } else {
-                    String.format("%04d-%02d-01", year, monthOneBased + 1)
-                }
+        return withContext(Dispatchers.IO) {
+                val (startDate, endDate) = monthBounds(year, month)
                 
                 val response = postgrest["personal_expenses"]
                     .select {
@@ -59,9 +59,6 @@ class ExpenseRepositoryImpl @Inject constructor(
                     }
                     .decodeList<PersonalExpenseDto>()
                 response.map { it.toDomain() }
-            }
-        } catch (e: Exception) {
-            emptyList()
         }
     }
 
@@ -95,8 +92,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                 }
                 true
             } catch (e: Exception) {
-                e.printStackTrace()
-                false
+                throw IllegalStateException("Could not save the transaction", e)
             }
         }
     }
@@ -136,8 +132,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                 } catch (_: Exception) {}
                 true
             } catch (e: Exception) {
-                e.printStackTrace()
-                false
+                throw IllegalStateException("Could not update the transaction", e)
             }
         }
     }
@@ -160,8 +155,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                 } catch (_: Exception) {}
                 true
             } catch (e: Exception) {
-                e.printStackTrace()
-                false
+                throw IllegalStateException("Could not delete the transaction", e)
             }
         }
     }
@@ -172,15 +166,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         month: Int,
         type: String
     ): Double {
-        return try {
-            withContext(Dispatchers.IO) {
-                val monthOneBased = month + 1
-                val startDate = String.format("%04d-%02d-01", year, monthOneBased)
-                val endDate = if (monthOneBased == 12) {
-                    String.format("%04d-%02d-01", year + 1, 1)
-                } else {
-                    String.format("%04d-%02d-01", year, monthOneBased + 1)
-                }
+        return withContext(Dispatchers.IO) {
+                val (startDate, endDate) = monthBounds(year, month)
                 
                 val expenses = postgrest["personal_expenses"]
                     .select {
@@ -194,9 +181,6 @@ class ExpenseRepositoryImpl @Inject constructor(
                     .decodeList<PersonalExpenseDto>()
                     
                 expenses.sumOf { it.amount }
-            }
-        } catch (e: Exception) {
-            0.0
         }
     }
 }
