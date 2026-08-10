@@ -99,7 +99,7 @@ fun GroupListScreen(
                                 name = group.name,
                                 memberCount = group.memberCount,
                                 imageUrl = group.imageUrl,
-                                balance = 0.0,
+                                balance = group.currentUserBalance,
                                 onClick = { onNavigateToGroupDetail(group.id) }
                             )
                         }

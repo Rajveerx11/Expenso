@@ -128,11 +128,10 @@ fun GroupDetailScreen(
         },
         containerColor = GlassBackground,
         snackbarHost = {
-            // Show success message
-            uiState.addMemberSuccess?.let { msg ->
+            (uiState.addMemberSuccess ?: uiState.error)?.let { msg ->
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
-                    containerColor = EmeraldGreen
+                    containerColor = if (uiState.error == null) EmeraldGreen else RoseRed
                 ) {
                     Text(msg, color = Color.White)
                 }

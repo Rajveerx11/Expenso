@@ -1,9 +1,5 @@
 package com.expenso.app.data.repository
 
-import com.expenso.app.data.dto.CreateGroupDto
-import com.expenso.app.data.dto.CreateGroupMemberDto
-import com.expenso.app.data.dto.CreateGroupExpenseDto
-import com.expenso.app.data.dto.CreateExpenseSplitDto
 import com.expenso.app.data.dto.GroupDto
 import com.expenso.app.data.dto.GroupMemberWithProfileDto
 import com.expenso.app.data.dto.GroupExpenseDto
@@ -32,48 +28,20 @@ class GroupRepositoryImpl @Inject constructor(
 ) : GroupRepository {
 
     override suspend fun getUserGroups(userId: String): List<Group> {
-        return try {
-            withContext(Dispatchers.IO) {
-                // First try via group_members
-                val memberDtos = try {
-                    postgrest["group_members"].select {
-                        filter { eq("user_id", userId) }
-                    }.decodeList<com.expenso.app.data.dto.GroupMemberDto>()
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                
-                val groupIdsFromMembers = memberDtos.map { it.groupId }
-                
-                // Also get groups where user is the creator (fallback)
-                val createdGroups = try {
-                    postgrest["groups"].select {
-                        filter { eq("created_by", userId) }
-                    }.decodeList<GroupDto>()
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                
-                val memberGroups = if (groupIdsFromMembers.isNotEmpty()) {
-                    try {
-                        postgrest["groups"].select {
-                            filter { isIn("id", groupIdsFromMembers) }
-                        }.decodeList<GroupDto>()
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                } else {
-                    emptyList()
-                }
-                
-                // Combine and deduplicate
-                (memberGroups + createdGroups)
-                    .distinctBy { it.id }
-                    .map { it.toDomain() }
+        return withContext(Dispatchers.IO) {
+            val memberDtos = postgrest["group_members"].select {
+                filter { eq("user_id", userId) }
+            }.decodeList<com.expenso.app.data.dto.GroupMemberDto>()
+            val groupIdsFromMembers = memberDtos.map { it.groupId }
+            val createdGroups = postgrest["groups"].select {
+                filter { eq("created_by", userId) }
+            }.decodeList<GroupDto>()
+            val memberGroups = if (groupIdsFromMembers.isEmpty()) emptyList() else {
+                postgrest["groups"].select {
+                    filter { isIn("id", groupIdsFromMembers) }
+                }.decodeList<GroupDto>()
             }
-        } catch (e: Exception) {
-            android.util.Log.e("GroupRepo", "getUserGroups failed: ${e.message}", e)
-            emptyList()
+            (memberGroups + createdGroups).distinctBy { it.id }.map { it.toDomain() }
         }
     }
 
@@ -93,39 +61,19 @@ class GroupRepositoryImpl @Inject constructor(
 
     override suspend fun createGroup(
         name: String,
-        description: String?,
-        createdBy: String
+        description: String?
     ): String? {
         return withContext(Dispatchers.IO) {
             try {
-                val groupId = java.util.UUID.randomUUID().toString()
-                
-                // Insert group with client-generated ID
-                postgrest["groups"].insert(buildJsonObject {
-                    put("id", groupId)
-                    put("name", name)
-                    if (description != null) put("description", description)
-                    put("created_by", createdBy)
-                    put("default_currency", "INR")
-                    put("simplified_debts", true)
-                })
-                
-                // Try to add creator as admin member - separate try-catch
-                try {
-                    postgrest["group_members"].insert(buildJsonObject {
-                        put("group_id", groupId)
-                        put("user_id", createdBy)
-                        put("role", "admin")
-                    })
-                } catch (memberException: Exception) {
-                    android.util.Log.e("GroupRepo", "Failed to add creator as member: ${memberException.message}", memberException)
-                    // Group was still created, don't fail
-                }
-                
-                groupId
+                postgrest.rpc(
+                    "create_group_with_admin",
+                    parameters = buildJsonObject {
+                        put("name_param", name)
+                        put("description_param", description)
+                    }
+                ).decodeAs<String>()
             } catch (e: Exception) {
-                android.util.Log.e("GroupRepo", "createGroup failed: ${e.message}", e)
-                null
+                throw IllegalStateException(e.message ?: "Could not create group", e)
             }
         }
     }
@@ -154,67 +102,65 @@ class GroupRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteGroup(groupId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                postgrest["groups"].delete {
-                    filter { eq("id", groupId) }
-                }
+        return withContext(Dispatchers.IO) {
+            try {
+                postgrest.rpc(
+                    "can_delete_group_safely",
+                    parameters = buildJsonObject { put("group_id_param", groupId) }
+                )
+                storage["group-images"].delete("$groupId.jpg")
+                postgrest.rpc(
+                    "delete_group_safely",
+                    parameters = buildJsonObject { put("group_id_param", groupId) }
+                )
                 true
+            } catch (e: Exception) {
+                throw IllegalStateException(e.message ?: "Could not delete group", e)
             }
-        } catch (e: Exception) {
-            false
         }
     }
 
     override suspend fun getGroupMembers(groupId: String): List<GroupMember> {
-        return try {
-            withContext(Dispatchers.IO) {
-                val members = postgrest["group_members"].select(
-                    columns = io.github.jan.supabase.postgrest.query.Columns.raw("*, profiles(*)")
-                ) {
-                    filter { eq("group_id", groupId) }
-                }.decodeList<GroupMemberWithProfileDto>()
-                
-                members.map { it.toDomain() }
-            }
-        } catch (e: Exception) {
-            emptyList()
+        return withContext(Dispatchers.IO) {
+            postgrest["group_members"].select(
+                columns = io.github.jan.supabase.postgrest.query.Columns.raw("*, profiles(*)")
+            ) {
+                filter { eq("group_id", groupId) }
+            }.decodeList<GroupMemberWithProfileDto>().map { it.toDomain() }
         }
     }
 
     override suspend fun addGroupMember(groupId: String, userEmail: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                val profile = postgrest["profiles"].select {
-                    filter { eq("email", userEmail) }
-                }.decodeSingleOrNull<ProfileDto>() ?: return@withContext false
-                
-                postgrest["group_members"].insert(buildJsonObject {
-                    put("group_id", groupId)
-                    put("user_id", profile.id)
-                    put("role", "editor")
-                })
+        return withContext(Dispatchers.IO) {
+            try {
+                postgrest.rpc(
+                    "add_group_member_by_email",
+                    parameters = buildJsonObject {
+                        put("group_id_param", groupId)
+                        put("email_param", userEmail)
+                    }
+                )
                 true
+            } catch (e: Exception) {
+                throw IllegalStateException(e.message ?: "Could not add member", e)
             }
-        } catch (e: Exception) {
-            android.util.Log.e("GroupRepo", "addGroupMember failed: ${e.message}", e)
-            false
         }
     }
 
     override suspend fun removeGroupMember(groupId: String, userId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                postgrest["group_members"].delete {
-                    filter { 
-                        eq("group_id", groupId)
-                        eq("user_id", userId) 
+        return withContext(Dispatchers.IO) {
+            try {
+                postgrest.rpc(
+                    "remove_group_member_safely",
+                    parameters = buildJsonObject {
+                        put("group_id_param", groupId)
+                        put("member_id_param", userId)
                     }
-                }
+                )
                 true
+            } catch (e: Exception) {
+                throw IllegalStateException(e.message ?: "Could not remove member", e)
             }
-        } catch (e: Exception) {
-            false
         }
     }
 
@@ -329,8 +275,7 @@ class GroupRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getGroupBalances(groupId: String, userId: String): List<GroupBalance> {
-        return try {
-            withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
                 @Serializable
                 data class RpcBalance(
                     @SerialName("user_id") val userId: String,
@@ -358,9 +303,6 @@ class GroupRepositoryImpl @Inject constructor(
                         balance = it.balance
                     )
                 }
-            }
-        } catch (e: Exception) {
-            emptyList()
         }
     }
 
@@ -373,8 +315,8 @@ class GroupRepositoryImpl @Inject constructor(
             withContext(Dispatchers.IO) {
                 val fileName = "$groupId.$extension"
                 val bucket = storage["group-images"]
-                bucket.upload(fileName, imageBytes)
-                bucket.publicUrl(fileName)
+                bucket.upload(fileName, imageBytes) { upsert = true }
+                "${bucket.publicUrl(fileName)}?v=${System.currentTimeMillis()}"
             }
         } catch (e: Exception) {
             null

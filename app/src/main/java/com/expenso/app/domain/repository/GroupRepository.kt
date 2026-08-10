@@ -9,7 +9,7 @@ import com.expenso.app.domain.model.ExpenseSplit
 interface GroupRepository {
     suspend fun getUserGroups(userId: String): List<Group>
     suspend fun getGroupById(groupId: String): Group?
-    suspend fun createGroup(name: String, description: String?, createdBy: String): String?
+    suspend fun createGroup(name: String, description: String?): String?
     suspend fun updateGroup(groupId: String, name: String, description: String?, imageUrl: String?): Boolean
     suspend fun deleteGroup(groupId: String): Boolean
     suspend fun getGroupMembers(groupId: String): List<GroupMember>

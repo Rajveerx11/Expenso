@@ -67,7 +67,7 @@ class GroupDetailViewModel @Inject constructor(
                 val expenses = expensesDeferred.await()
                 val balances = balancesDeferred.await()
                 
-                val isAdmin = group?.createdBy == userId
+                val isAdmin = members.any { it.userId == userId && it.role == "admin" }
 
                 _uiState.update { 
                     it.copy(

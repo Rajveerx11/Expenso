@@ -3,6 +3,7 @@ package com.expenso.app.ui.screen.groups
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expenso.app.domain.model.Group
+import com.expenso.app.domain.model.withSummary
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.GroupRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import javax.inject.Inject
 
 data class GroupListUiState(
@@ -38,7 +41,14 @@ class GroupListViewModel @Inject constructor(
             try {
                 val userId = authRepository.getCurrentUserId()
                 if (userId != null) {
-                    val groups = groupRepository.getUserGroups(userId)
+                    val groups = groupRepository.getUserGroups(userId).map { group ->
+                        async {
+                            group.withSummary(
+                                members = groupRepository.getGroupMembers(group.id),
+                                balances = groupRepository.getGroupBalances(group.id, userId)
+                            )
+                        }
+                    }.awaitAll()
                     _uiState.update { it.copy(groups = groups, isLoading = false) }
                 } else {
                     _uiState.update { it.copy(isLoading = false, error = "User not logged in") }

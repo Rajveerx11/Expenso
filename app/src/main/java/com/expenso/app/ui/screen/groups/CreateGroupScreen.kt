@@ -2,6 +2,8 @@ package com.expenso.app.ui.screen.groups
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,10 +26,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expenso.app.ui.components.GlassCard
 import com.expenso.app.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.expenso.app.ui.util.compressSelectedImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +41,18 @@ fun CreateGroupScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                compressSelectedImage(context, it).fold(
+                    onSuccess = viewModel::selectImage,
+                    onFailure = { error -> viewModel.setImageError(error.message ?: "Could not process image") }
+                )
+            }
+        }
+    }
 
     var showSuccessOverlay by remember { mutableStateOf(false) }
     val successScale = remember { Animatable(0f) }
@@ -83,6 +100,13 @@ fun CreateGroupScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text("Group Details", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DeepIndigo)
+
+                        OutlinedButton(
+                            onClick = { imagePicker.launch("image/*") },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (uiState.imageBytes == null) "Choose group image" else "Group image selected")
+                        }
                         
                         OutlinedTextField(
                             value = uiState.name,
@@ -218,7 +242,11 @@ fun CreateGroupScreen(
                         if (uiState.isLoading) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                         } else {
-                            Text("Create Group", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (uiState.createdGroupId == null) "Create Group" else "Retry Remaining Setup",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
