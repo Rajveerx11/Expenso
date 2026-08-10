@@ -14,6 +14,8 @@ import javax.inject.Inject
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
+    val needsOnboarding: Boolean = false,
+    val emailConfirmationRequired: Boolean = false,
     val error: String? = null
 )
 
@@ -35,7 +37,14 @@ class LoginViewModel @Inject constructor(
             val result = authRepository.signIn(email.trim(), password)
             result.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(isLoading = false, isSuccess = true) }
+                    val needsOnboarding = authRepository.needsOnboarding()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isSuccess = true,
+                            needsOnboarding = needsOnboarding
+                        )
+                    }
                 },
                 onFailure = { throwable ->
                     _uiState.update {
@@ -44,6 +53,36 @@ class LoginViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    fun signInWithGoogle(idToken: String, nonce: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            authRepository.signInWithGoogle(idToken, nonce).fold(
+                onSuccess = {
+                    val needsOnboarding = authRepository.needsOnboarding()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isSuccess = true,
+                            needsOnboarding = needsOnboarding
+                        )
+                    }
+                },
+                onFailure = { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = throwable.localizedMessage ?: "Google sign-in failed"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun reportGoogleSignInError(message: String) {
+        _uiState.update { it.copy(isLoading = false, error = message) }
     }
 
     fun clearError() {

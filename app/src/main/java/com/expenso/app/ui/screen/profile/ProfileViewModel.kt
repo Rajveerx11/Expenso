@@ -15,6 +15,8 @@ import javax.inject.Inject
 
 data class ProfileUiState(
     val isLoading: Boolean = true,
+    val isSigningOut: Boolean = false,
+    val isSignedOut: Boolean = false,
     val user: User? = null,
     val error: String? = null
 )
@@ -48,7 +50,22 @@ class ProfileViewModel @Inject constructor(
 
     fun signOut() {
         viewModelScope.launch {
-            authRepository.signOut()
+            _uiState.update { it.copy(isSigningOut = true, error = null) }
+            authRepository.signOut().fold(
+                onSuccess = {
+                    _uiState.update { it.copy(isSigningOut = false, isSignedOut = true) }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isSigningOut = false,
+                            error = error.localizedMessage ?: "Sign out failed"
+                        )
+                    }
+                }
+            )
         }
     }
+
+    fun clearError() = _uiState.update { it.copy(error = null) }
 }

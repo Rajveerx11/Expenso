@@ -18,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.expenso.app.ui.components.BottomNavBar
 import com.expenso.app.ui.screen.auth.LoginScreen
+import com.expenso.app.ui.screen.auth.OnboardingScreen
 import com.expenso.app.ui.screen.auth.SignUpScreen
 import com.expenso.app.ui.screen.expenses.AddExpenseScreen
 import com.expenso.app.ui.screen.expenses.ExpenseListScreen
@@ -94,6 +95,11 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
                             popUpTo(Screen.Splash.route) { inclusive = true }
                         }
                     },
+                    onNavigateToOnboarding = {
+                        navController.navigate(Screen.Onboarding.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+                    },
                     onNavigateToHome = {
                         navController.navigate(Screen.Home.route) {
                             popUpTo(Screen.Splash.route) { inclusive = true }
@@ -104,8 +110,10 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
 
             composable(Screen.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = {
-                        navController.navigate(Screen.Home.route) {
+                    onLoginSuccess = { needsOnboarding ->
+                        navController.navigate(
+                            if (needsOnboarding) Screen.Onboarding.route else Screen.Home.route
+                        ) {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
@@ -117,8 +125,10 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
 
             composable(Screen.SignUp.route) {
                 SignUpScreen(
-                    onSignUpSuccess = {
-                        navController.navigate(Screen.Home.route) {
+                    onSignUpSuccess = { needsOnboarding ->
+                        navController.navigate(
+                            if (needsOnboarding) Screen.Onboarding.route else Screen.Home.route
+                        ) {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
@@ -129,6 +139,16 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
             }
 
             // ─── Main Tabs ─────────────────────────────────────
+            composable(Screen.Onboarding.route) {
+                OnboardingScreen(
+                    onComplete = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(Screen.Home.route) {
                 HomeScreen(
                     onNavigateToAddExpense = { type ->
