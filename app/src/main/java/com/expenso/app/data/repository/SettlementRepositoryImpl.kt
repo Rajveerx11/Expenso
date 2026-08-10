@@ -1,14 +1,13 @@
 package com.expenso.app.data.repository
 
-import com.expenso.app.data.dto.CreateSettlementDto
 import com.expenso.app.data.dto.SettlementDto
+import com.expenso.app.data.dto.ProfileDto
 import com.expenso.app.data.mapper.toDomain
 import com.expenso.app.domain.model.Settlement
 import com.expenso.app.domain.repository.SettlementRepository
 import io.github.jan.supabase.postgrest.Postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -18,16 +17,21 @@ class SettlementRepositoryImpl @Inject constructor(
 ) : SettlementRepository {
 
     override suspend fun getGroupSettlements(groupId: String): List<Settlement> {
-        return try {
-            withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
                 val settlements = postgrest["settlements"].select {
                     filter { eq("group_id", groupId) }
                 }.decodeList<SettlementDto>()
-                
-                settlements.map { it.toDomain() }
-            }
-        } catch (e: Exception) {
-            emptyList()
+                if (settlements.isEmpty()) return@withContext emptyList()
+                val userIds = settlements.flatMap { listOf(it.payerId, it.receiverId) }.distinct()
+                val profiles = postgrest["profiles"].select {
+                    filter { isIn("id", userIds) }
+                }.decodeList<ProfileDto>().associateBy { it.id }
+                settlements.map { dto ->
+                    dto.toDomain().copy(
+                        payerName = profiles[dto.payerId]?.fullName ?: "Unknown",
+                        receiverName = profiles[dto.receiverId]?.fullName ?: "Unknown"
+                    )
+                }.sortedByDescending { it.createdAt }
         }
     }
 
@@ -40,17 +44,15 @@ class SettlementRepositoryImpl @Inject constructor(
     ): Boolean {
         return try {
             withContext(Dispatchers.IO) {
-                val dto = CreateSettlementDto(
-                    groupId = groupId,
-                    payerId = payerId,
-                    receiverId = receiverId,
-                    amount = amount,
-                    status = "pending_confirmation",
-                    transactionRef = transactionRef,
-                    confirmationToken = UUID.randomUUID().toString()
-                )
-                postgrest["settlements"].insert(dto)
-                true
+                postgrest.rpc(
+                    "create_settlement",
+                    parameters = buildJsonObject {
+                        put("group_id_param", groupId)
+                        put("receiver_id_param", receiverId)
+                        put("amount_param", amount)
+                        put("transaction_ref_param", transactionRef)
+                    }
+                ).decodeAs<String>().isNotBlank()
             }
         } catch (e: Exception) {
             false
@@ -66,8 +68,7 @@ class SettlementRepositoryImpl @Inject constructor(
                         put("settlement_id_param", settlementId)
                         put("user_id_param", userId)
                     }
-                )
-                true
+                ).decodeAs<Boolean>()
             }
         } catch (e: Exception) {
             false
@@ -77,12 +78,10 @@ class SettlementRepositoryImpl @Inject constructor(
     override suspend fun rejectSettlement(settlementId: String, userId: String): Boolean {
         return try {
             withContext(Dispatchers.IO) {
-                postgrest["settlements"].update(
-                    mapOf("status" to "rejected")
-                ) {
-                    filter { eq("id", settlementId) }
-                }
-                true
+                postgrest.rpc(
+                    "reject_settlement",
+                    parameters = buildJsonObject { put("settlement_id_param", settlementId) }
+                ).decodeAs<Boolean>()
             }
         } catch (e: Exception) {
             false

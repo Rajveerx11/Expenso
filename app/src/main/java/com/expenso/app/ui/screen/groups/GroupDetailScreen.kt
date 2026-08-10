@@ -30,6 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.expenso.app.domain.model.GroupBalance
 import com.expenso.app.domain.model.GroupExpense
 import com.expenso.app.domain.model.GroupMember
+import com.expenso.app.domain.model.Settlement
 import com.expenso.app.ui.components.AvatarImage
 import com.expenso.app.ui.components.ConfirmationDialog
 import com.expenso.app.ui.components.EmptyStateView
@@ -128,11 +129,10 @@ fun GroupDetailScreen(
         },
         containerColor = GlassBackground,
         snackbarHost = {
-            // Show success message
-            uiState.addMemberSuccess?.let { msg ->
+            (uiState.addMemberSuccess ?: uiState.error)?.let { msg ->
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
-                    containerColor = EmeraldGreen
+                    containerColor = if (uiState.error == null) EmeraldGreen else RoseRed
                 ) {
                     Text(msg, color = Color.White)
                 }
@@ -178,7 +178,7 @@ fun GroupDetailScreen(
                     }
                 }
                 
-                val tabs = listOf("Expenses", "Members", "Balances")
+                val tabs = listOf("Expenses", "Members", "Balances", "Settlements")
                 TabRow(
                     selectedTabIndex = uiState.selectedTab,
                     containerColor = GlassBackground,
@@ -221,6 +221,14 @@ fun GroupDetailScreen(
                         onSettleUp = { receiverId ->
                             group?.id?.let { onNavigateToSettleUp(it, receiverId) }
                         }
+                    )
+                    3 -> SettlementList(
+                        settlements = uiState.settlements,
+                        currentUserId = uiState.currentUserId,
+                        respondingSettlementId = uiState.respondingSettlementId,
+                        currencyFormat = currencyFormat,
+                        onConfirm = viewModel::confirmSettlement,
+                        onReject = viewModel::rejectSettlement
                     )
                 }
             }
@@ -487,7 +495,8 @@ private fun BalancesList(
     currencyFormat: NumberFormat,
     onSettleUp: (String) -> Unit
 ) {
-    if (balances.isEmpty()) {
+    val nonZeroBalances = balances.filter { kotlin.math.abs(it.balance) >= 0.005 }
+    if (nonZeroBalances.isEmpty()) {
         EmptyStateView(
             icon = "🎉",
             title = "All Settled Up!",
@@ -498,7 +507,7 @@ private fun BalancesList(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(balances) { balance ->
+            items(nonZeroBalances) { balance ->
                 val isPositive = balance.balance > 0
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -526,7 +535,7 @@ private fun BalancesList(
                                 }
                             }
                             Text(
-                                text = if (isPositive) "is owed" else "owes",
+                                text = if (isPositive) "owes you" else "you owe",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MediumGrey
                             )
@@ -546,6 +555,77 @@ private fun BalancesList(
                                 ) {
                                     Text("Settle Up", fontSize = 12.sp, color = DeepIndigo)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettlementList(
+    settlements: List<Settlement>,
+    currentUserId: String,
+    respondingSettlementId: String?,
+    currencyFormat: NumberFormat,
+    onConfirm: (String) -> Unit,
+    onReject: (String) -> Unit
+) {
+    if (settlements.isEmpty()) {
+        EmptyStateView(
+            icon = "✓",
+            title = "No Settlements Yet",
+            subtitle = "Settlement requests and completed history appear here."
+        )
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(settlements, key = { it.id }) { settlement ->
+            val isReceiver = settlement.receiverId == currentUserId
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "${settlement.payerName} → ${settlement.receiverName}",
+                        fontWeight = FontWeight.Bold,
+                        color = NearBlack
+                    )
+                    Text(currencyFormat.format(settlement.amount), color = DeepIndigo, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        when (settlement.status) {
+                            "pending_confirmation" -> "Pending receiver confirmation"
+                            "confirmed" -> "Confirmed"
+                            "rejected" -> "Rejected"
+                            else -> settlement.status
+                        },
+                        color = when (settlement.status) {
+                            "confirmed" -> EmeraldGreen
+                            "rejected" -> RoseRed
+                            else -> MediumGrey
+                        }
+                    )
+                    settlement.transactionRef?.let { Text("Reference: $it", style = MaterialTheme.typography.bodySmall) }
+                    if (isReceiver && settlement.status == "pending_confirmation") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { onReject(settlement.id) },
+                                enabled = respondingSettlementId == null
+                            ) { Text("Reject", color = RoseRed) }
+                            Button(
+                                onClick = { onConfirm(settlement.id) },
+                                enabled = respondingSettlementId == null,
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
+                            ) {
+                                if (respondingSettlementId == settlement.id) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+                                } else Text("Confirm")
                             }
                         }
                     }

@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expenso.app.ui.components.AvatarImage
 import com.expenso.app.ui.components.GlassCard
@@ -65,7 +67,7 @@ fun SettlementScreen(
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Settled Successfully!", fontWeight = FontWeight.Bold, color = EmeraldGreen)
+                    Text("Request sent for confirmation", fontWeight = FontWeight.Bold, color = EmeraldGreen)
                 }
             }
 
@@ -84,11 +86,15 @@ fun SettlementScreen(
                             fontWeight = FontWeight.Medium
                         )
                         
-                        Text(
-                            text = "₹${String.format("%.2f", uiState.amount)}",
-                            style = MaterialTheme.typography.displayMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = DeepIndigo
+                        OutlinedTextField(
+                            value = uiState.amountInput,
+                            onValueChange = viewModel::updateAmount,
+                            label = { Text("Settlement amount") },
+                            prefix = { Text("₹") },
+                            supportingText = { Text("Outstanding: ₹${String.format(java.util.Locale.ROOT, "%.2f", uiState.maxAmount)}") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
 
                         uiState.receiverUpiId?.let {
@@ -120,7 +126,7 @@ fun SettlementScreen(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("Mark as Paid", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Send Request", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

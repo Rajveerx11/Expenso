@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.GroupRepository
 import com.expenso.app.domain.repository.SettlementRepository
+import com.expenso.app.domain.model.validatedSettlementAmount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,8 @@ import kotlin.math.abs
 data class SettlementUiState(
     val receiverName: String = "",
     val receiverUpiId: String? = null,
-    val amount: Double = 0.0,
+    val maxAmount: Double = 0.0,
+    val amountInput: String = "",
     val transactionRef: String = "",
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
@@ -46,7 +48,7 @@ class SettlementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val userId = authRepository.getCurrentUserId() ?: return@launch
+                val userId = authRepository.getCurrentUserId() ?: error("Sign in again to view settlements")
                 val balances = groupRepository.getGroupBalances(groupId, userId)
                 val memberBalance = balances.find { it.userId == receiverId }
                 
@@ -54,7 +56,8 @@ class SettlementViewModel @Inject constructor(
                     _uiState.update { 
                         it.copy(
                             receiverName = memberBalance.userName,
-                            amount = abs(memberBalance.balance),
+                            maxAmount = abs(memberBalance.balance),
+                            amountInput = String.format(java.util.Locale.ROOT, "%.2f", abs(memberBalance.balance)),
                             isLoading = false
                         )
                     }
@@ -71,31 +74,34 @@ class SettlementViewModel @Inject constructor(
         _uiState.update { it.copy(transactionRef = ref) }
     }
 
+    fun updateAmount(amount: String) {
+        if (amount.isEmpty() || amount.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+            _uiState.update { it.copy(amountInput = amount, error = null) }
+        }
+    }
+
     fun settle() {
+        if (_uiState.value.isLoading || _uiState.value.isSuccess) return
+        _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val userId = authRepository.getCurrentUserId() ?: return@launch
-                // We're using groupRepository.addGroupExpense as a way to create a settlement
-                // In a real app we might use a dedicated settlement repository
-                val success = groupRepository.addGroupExpense(
+                val userId = authRepository.getCurrentUserId() ?: error("Sign in again to send a settlement")
+                val amount = validatedSettlementAmount(
+                    _uiState.value.amountInput,
+                    _uiState.value.maxAmount
+                )
+                val success = settlementRepository.createSettlement(
                     groupId = groupId,
-                    paidBy = userId,
-                    title = "Settlement to ${_uiState.value.receiverName}",
-                    totalAmount = _uiState.value.amount,
-                    category = "Other",
-                    splitType = "exact",
-                    note = "Transaction Ref: ${_uiState.value.transactionRef}",
-                    expenseDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()),
-                    splits = listOf(
-                        receiverId to _uiState.value.amount
-                    )
+                    payerId = userId,
+                    receiverId = receiverId,
+                    amount = amount,
+                    transactionRef = _uiState.value.transactionRef.trim().takeIf { it.isNotEmpty() }
                 )
                 
                 if (success) {
                     _uiState.update { it.copy(isLoading = false, isSuccess = true) }
                 } else {
-                    _uiState.update { it.copy(isLoading = false, error = "Settlement failed") }
+                    _uiState.update { it.copy(isLoading = false, error = "Could not send settlement request") }
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }

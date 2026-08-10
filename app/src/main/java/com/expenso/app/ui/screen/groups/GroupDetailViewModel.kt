@@ -7,6 +7,7 @@ import com.expenso.app.domain.model.Group
 import com.expenso.app.domain.model.GroupBalance
 import com.expenso.app.domain.model.GroupExpense
 import com.expenso.app.domain.model.GroupMember
+import com.expenso.app.domain.model.Settlement
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.GroupRepository
 import com.expenso.app.domain.repository.SettlementRepository
@@ -24,6 +25,8 @@ data class GroupDetailUiState(
     val members: List<GroupMember> = emptyList(),
     val expenses: List<GroupExpense> = emptyList(),
     val balances: List<GroupBalance> = emptyList(),
+    val settlements: List<Settlement> = emptyList(),
+    val respondingSettlementId: String? = null,
     val currentUserId: String = "",
     val isAdmin: Boolean = false,
     val selectedTab: Int = 0,
@@ -61,11 +64,13 @@ class GroupDetailViewModel @Inject constructor(
                 val membersDeferred = async { groupRepository.getGroupMembers(groupId) }
                 val expensesDeferred = async { groupRepository.getGroupExpenses(groupId) }
                 val balancesDeferred = async { groupRepository.getGroupBalances(groupId, userId) }
+                val settlementsDeferred = async { settlementRepository.getGroupSettlements(groupId) }
                 
                 val group = groupDeferred.await()
                 val members = membersDeferred.await()
                 val expenses = expensesDeferred.await()
                 val balances = balancesDeferred.await()
+                val settlements = settlementsDeferred.await()
                 
                 val isAdmin = group?.createdBy == userId
 
@@ -75,6 +80,7 @@ class GroupDetailViewModel @Inject constructor(
                         members = members,
                         expenses = expenses,
                         balances = balances,
+                        settlements = settlements,
                         currentUserId = userId,
                         isAdmin = isAdmin,
                         isLoading = false
@@ -92,6 +98,30 @@ class GroupDetailViewModel @Inject constructor(
 
     fun refresh() {
         loadGroupDetail()
+    }
+
+    fun confirmSettlement(settlementId: String) = respondToSettlement(settlementId, confirm = true)
+
+    fun rejectSettlement(settlementId: String) = respondToSettlement(settlementId, confirm = false)
+
+    private fun respondToSettlement(settlementId: String, confirm: Boolean) {
+        if (_uiState.value.respondingSettlementId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(respondingSettlementId = settlementId, error = null) }
+            try {
+                val userId = authRepository.getCurrentUserId() ?: error("Sign in again")
+                val success = if (confirm) {
+                    settlementRepository.confirmSettlement(settlementId, userId)
+                } else {
+                    settlementRepository.rejectSettlement(settlementId, userId)
+                }
+                if (!success) error("Settlement no longer exists")
+                _uiState.update { it.copy(respondingSettlementId = null) }
+                loadGroupDetail()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(respondingSettlementId = null, error = e.message) }
+            }
+        }
     }
     
     fun addMemberByEmail(email: String) {
