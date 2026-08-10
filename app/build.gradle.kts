@@ -7,6 +7,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Local and CI builds remain valid without Firebase credentials. Production
+// builds apply the plugin as soon as the untracked configuration file exists.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.expenso.app"
     compileSdk = 35
@@ -95,6 +101,10 @@ dependencies {
     // Kotlinx
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.serialization.json)
+
+    // Firebase Cloud Messaging
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     // Tests
     testImplementation(libs.junit)

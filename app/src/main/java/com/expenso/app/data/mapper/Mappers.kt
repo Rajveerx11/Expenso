@@ -7,6 +7,7 @@ import com.expenso.app.data.dto.GroupMemberWithProfileDto
 import com.expenso.app.data.dto.GroupExpenseDto
 import com.expenso.app.data.dto.ExpenseSplitDto
 import com.expenso.app.data.dto.SettlementDto
+import com.expenso.app.data.dto.NotificationDto
 import com.expenso.app.domain.model.User
 import com.expenso.app.domain.model.PersonalExpense
 import com.expenso.app.domain.model.Group
@@ -14,6 +15,7 @@ import com.expenso.app.domain.model.GroupMember
 import com.expenso.app.domain.model.GroupExpense
 import com.expenso.app.domain.model.ExpenseSplit
 import com.expenso.app.domain.model.Settlement
+import com.expenso.app.domain.model.AppNotification
 
 fun ProfileDto.toDomain(): User {
     return User(
@@ -112,5 +114,18 @@ fun SettlementDto.toDomain(): Settlement {
         transactionRef = transactionRef,
         createdAt = createdAt,
         confirmedAt = confirmedAt
+    )
+}
+
+fun NotificationDto.toDomain(): AppNotification {
+    return AppNotification(
+        id = id,
+        title = title,
+        message = message,
+        type = type,
+        groupId = groupId,
+        relatedId = relatedId,
+        isRead = readAt != null,
+        createdAt = createdAt
     )
 }

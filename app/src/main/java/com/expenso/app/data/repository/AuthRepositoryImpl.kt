@@ -4,6 +4,7 @@ import com.expenso.app.data.dto.ProfileDto
 import com.expenso.app.data.mapper.toDomain
 import com.expenso.app.domain.model.User
 import com.expenso.app.domain.repository.AuthRepository
+import com.expenso.app.core.notification.PushTokenManager
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -14,7 +15,8 @@ import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
     private val auth: Auth,
-    private val postgrest: Postgrest
+    private val postgrest: Postgrest,
+    private val pushTokenManager: PushTokenManager
 ) : AuthRepository {
 
     override suspend fun signUp(email: String, password: String, fullName: String): Result<Unit> {
@@ -76,11 +78,10 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signOut() {
-        try {
+    override suspend fun signOut(): Result<Unit> {
+        return runCatching {
+            pushTokenManager.unregisterCurrentDevice().getOrThrow()
             auth.signOut()
-        } catch (e: Exception) {
-            // Safe fallback
         }
     }
 }

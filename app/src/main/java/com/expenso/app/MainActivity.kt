@@ -1,11 +1,21 @@
 package com.expenso.app
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.expenso.app.core.notification.RealtimeNotificationListener
+import com.expenso.app.core.notification.NotificationPermissionPolicy
+import com.expenso.app.core.notification.PushTokenManager
 import com.expenso.app.ui.navigation.ExpensoNavGraph
 import com.expenso.app.ui.theme.ExpensoTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -22,27 +32,34 @@ class MainActivity : AppCompatActivity() {
     lateinit var auth: Auth
 
     @Inject
-    lateinit var realtimeListener: RealtimeNotificationListener
+    lateinit var pushTokenManager: PushTokenManager
+
+    private var pendingDeepLink by mutableStateOf<String?>(null)
+    private var isAuthenticated by mutableStateOf(false)
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         try {
             enableEdgeToEdge()
         } catch (_: Exception) {}
         super.onCreate(savedInstanceState)
+        pendingDeepLink = extractDeepLink(intent)
 
-        // Start realtime notifications when user is authenticated
+        lifecycleScope.launch {
+            pushTokenManager.retryPendingUnregistration()
+        }
+
         lifecycleScope.launch {
             auth.sessionStatus.collectLatest { status ->
                 when (status) {
                     is SessionStatus.Authenticated -> {
-                        val userId = status.session.user?.id
-                        if (userId != null) {
-                            realtimeListener.startListening(userId)
-                        }
+                        isAuthenticated = true
+                        pushTokenManager.syncCurrentToken()
+                        requestNotificationPermissionOnce()
                     }
-                    is SessionStatus.NotAuthenticated -> {
-                        realtimeListener.stopListening()
-                    }
+                    is SessionStatus.NotAuthenticated -> isAuthenticated = false
                     else -> {}
                 }
             }
@@ -50,13 +67,36 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             ExpensoTheme {
-                ExpensoNavGraph()
+                ExpensoNavGraph(
+                    pendingDeepLink = pendingDeepLink.takeIf { isAuthenticated },
+                    onDeepLinkConsumed = { pendingDeepLink = null }
+                )
             }
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        realtimeListener.stopListening()
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingDeepLink = extractDeepLink(intent)
     }
+
+    private fun requestNotificationPermissionOnce() {
+        val preferences = getSharedPreferences("notification_permission", MODE_PRIVATE)
+        val isGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (NotificationPermissionPolicy.shouldRequest(
+                sdkInt = Build.VERSION.SDK_INT,
+                isAuthenticated = true,
+                isGranted = isGranted,
+                wasAlreadyRequested = preferences.getBoolean("requested", false)
+            )
+        ) {
+            preferences.edit().putBoolean("requested", true).apply()
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun extractDeepLink(intent: Intent?): String? =
+        intent?.dataString ?: intent?.getStringExtra("deep_link")
 }

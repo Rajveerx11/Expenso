@@ -18,6 +18,7 @@ sealed class Screen(val route: String) {
     object Expenses : Screen("expenses")
     object Groups : Screen("groups")
     object Profile : Screen("profile")
+    object Notifications : Screen("notifications")
     
     // Expense sub-screens
     object AddExpense : Screen("add_expense")
@@ -38,6 +39,10 @@ sealed class Screen(val route: String) {
     }
     object SettleUp : Screen("settle_up/{groupId}/{receiverId}") {
         fun createRoute(groupId: String, receiverId: String) = "settle_up/$groupId/$receiverId"
+    }
+    object SettlementConfirmation : Screen("settlement_confirmation/{groupId}/{settlementId}") {
+        fun createRoute(groupId: String, settlementId: String) =
+            "settlement_confirmation/$groupId/$settlementId"
     }
     
     // Profile sub-screens  

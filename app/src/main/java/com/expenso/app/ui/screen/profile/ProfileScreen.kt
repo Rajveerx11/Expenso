@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Payment
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material3.Card
@@ -59,6 +60,7 @@ import java.util.Locale
 @Composable
 fun ProfileScreen(
     onNavigateToEditProfile: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
     onSignOut: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
@@ -201,13 +203,29 @@ fun ProfileScreen(
                     bgColor = LightestIndigo
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Card(
-                    onClick = {
-                        viewModel.signOut()
-                        onSignOut()
-                    },
+                    onClick = onNavigateToNotifications,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = LightestIndigo),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Notifications, null, tint = DeepIndigo, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Notifications", color = DeepIndigo, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Card(
+                    onClick = { viewModel.signOut(onSignOut) },
+                    enabled = !uiState.isSigningOut,
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = SoftRed
@@ -228,12 +246,16 @@ fun ProfileScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Sign Out",
+                            text = if (uiState.isSigningOut) "Signing Out..." else "Sign Out",
                             color = RoseRed,
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp
                         )
                     }
+                }
+                uiState.error?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = error, color = RoseRed, fontSize = 13.sp)
                 }
             }
         }

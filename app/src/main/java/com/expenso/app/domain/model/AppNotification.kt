@@ -4,7 +4,8 @@ data class AppNotification(
     val id: String,
     val title: String,
     val message: String,
-    val type: String, // "expense_added", "settlement_request", "settlement_confirmed", "group_invite"
+    val type: String,
+    val groupId: String?,
     val relatedId: String?,
     val isRead: Boolean,
     val createdAt: String
