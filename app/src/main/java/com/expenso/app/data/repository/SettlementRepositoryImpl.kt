@@ -1,6 +1,5 @@
 package com.expenso.app.data.repository
 
-import com.expenso.app.data.dto.CreateSettlementDto
 import com.expenso.app.data.dto.SettlementDto
 import com.expenso.app.data.mapper.toDomain
 import com.expenso.app.domain.model.Settlement
@@ -8,7 +7,6 @@ import com.expenso.app.domain.repository.SettlementRepository
 import io.github.jan.supabase.postgrest.Postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -40,16 +38,15 @@ class SettlementRepositoryImpl @Inject constructor(
     ): Boolean {
         return try {
             withContext(Dispatchers.IO) {
-                val dto = CreateSettlementDto(
-                    groupId = groupId,
-                    payerId = payerId,
-                    receiverId = receiverId,
-                    amount = amount,
-                    status = "pending_confirmation",
-                    transactionRef = transactionRef,
-                    confirmationToken = UUID.randomUUID().toString()
+                postgrest.rpc(
+                    "create_settlement",
+                    parameters = buildJsonObject {
+                        put("group_id_param", groupId)
+                        put("receiver_id_param", receiverId)
+                        put("amount_param", amount)
+                        put("transaction_ref_param", transactionRef)
+                    }
                 )
-                postgrest["settlements"].insert(dto)
                 true
             }
         } catch (e: Exception) {
@@ -77,11 +74,10 @@ class SettlementRepositoryImpl @Inject constructor(
     override suspend fun rejectSettlement(settlementId: String, userId: String): Boolean {
         return try {
             withContext(Dispatchers.IO) {
-                postgrest["settlements"].update(
-                    mapOf("status" to "rejected")
-                ) {
-                    filter { eq("id", settlementId) }
-                }
+                postgrest.rpc(
+                    "reject_settlement",
+                    parameters = buildJsonObject { put("settlement_id_param", settlementId) }
+                )
                 true
             }
         } catch (e: Exception) {
