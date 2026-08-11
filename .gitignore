@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+app/google-services.json
+google-services.json
+*firebase-adminsdk*.json
+__pycache__/
+*.pyc

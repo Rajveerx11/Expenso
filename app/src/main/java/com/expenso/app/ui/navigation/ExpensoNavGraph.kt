@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -30,16 +31,36 @@ import com.expenso.app.ui.screen.home.HomeScreen
 import com.expenso.app.ui.screen.profile.EditProfileScreen
 import com.expenso.app.ui.screen.profile.ProfileScreen
 import com.expenso.app.ui.screen.settlement.SettlementScreen
+import com.expenso.app.ui.screen.settlement.SettlementConfirmationScreen
+import com.expenso.app.ui.screen.notifications.NotificationScreen
+import com.expenso.app.core.notification.NotificationRoute
 import com.expenso.app.ui.screen.splash.SplashScreen
 
 private val bottomNavRoutes = BottomNavItem.entries.map { it.route }
 
 @Composable
-fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) {
+fun ExpensoNavGraph(
+    navController: NavHostController = rememberNavController(),
+    pendingDeepLink: String? = null,
+    onDeepLinkConsumed: () -> Unit = {}
+) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
     val showBottomBar = currentRoute in bottomNavRoutes
+
+    LaunchedEffect(pendingDeepLink, currentRoute) {
+        val isAuthRoute = currentRoute in setOf(
+            Screen.Splash.route,
+            Screen.Login.route,
+            Screen.SignUp.route
+        )
+        if (pendingDeepLink != null && currentRoute != null && !isAuthRoute) {
+            val route = NotificationRoute.toAppRoute(pendingDeepLink)
+            onDeepLinkConsumed()
+            route?.let { navController.navigate(it) { launchSingleTop = true } }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -171,6 +192,9 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
                     onNavigateToEditProfile = {
                         navController.navigate(Screen.EditProfile.route)
                     },
+                    onNavigateToNotifications = {
+                        navController.navigate(Screen.Notifications.route)
+                    },
                     onSignOut = {
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
@@ -204,6 +228,15 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
             composable(Screen.EditProfile.route) {
                 EditProfileScreen(
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Notifications.route) {
+                NotificationScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenNotification = { notification ->
+                        navController.navigate(NotificationRoute.forNotification(notification))
+                    }
                 )
             }
 
@@ -261,6 +294,19 @@ fun ExpensoNavGraph(navController: NavHostController = rememberNavController()) 
                 )
             ) {
                 SettlementScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+
+            composable(
+                route = Screen.SettlementConfirmation.route,
+                arguments = listOf(
+                    navArgument("groupId") { type = NavType.StringType },
+                    navArgument("settlementId") { type = NavType.StringType }
+                )
+            ) {
+                SettlementConfirmationScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

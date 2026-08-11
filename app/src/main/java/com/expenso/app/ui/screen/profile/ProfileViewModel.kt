@@ -15,6 +15,7 @@ import javax.inject.Inject
 
 data class ProfileUiState(
     val isLoading: Boolean = true,
+    val isSigningOut: Boolean = false,
     val user: User? = null,
     val error: String? = null
 )
@@ -46,9 +47,24 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun signOut() {
+    fun signOut(onSuccess: () -> Unit) {
+        if (_uiState.value.isSigningOut) return
+        _uiState.update { it.copy(isSigningOut = true, error = null) }
         viewModelScope.launch {
-            authRepository.signOut()
+            authRepository.signOut().fold(
+                onSuccess = {
+                    _uiState.update { it.copy(isSigningOut = false) }
+                    onSuccess()
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isSigningOut = false,
+                            error = error.message ?: "Could not securely sign out"
+                        )
+                    }
+                }
+            )
         }
     }
 }
