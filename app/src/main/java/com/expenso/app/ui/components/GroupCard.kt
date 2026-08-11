@@ -25,6 +25,8 @@ import com.expenso.app.ui.theme.GradientMiddle
 import com.expenso.app.ui.theme.GradientStart
 import com.expenso.app.ui.theme.NeutralMedium
 import com.expenso.app.ui.theme.RoseRed
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun GroupCard(
@@ -35,6 +37,7 @@ fun GroupCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
     Box(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
         GlassCard(
             modifier = Modifier.fillMaxWidth()
@@ -101,7 +104,7 @@ fun GroupCard(
                         color = NeutralMedium
                     )
                     Text(
-                        text = "₹${Math.abs(balance)}",
+                        text = currencyFormat.format(kotlin.math.abs(balance)),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (isOwedToYou) EmeraldGreen else RoseRed

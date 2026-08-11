@@ -15,6 +15,8 @@ import javax.inject.Inject
 data class GroupSettingsUiState(
     val name: String = "",
     val description: String = "",
+    val imageUrl: String? = null,
+    val isUploadingImage: Boolean = false,
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val isDeleted: Boolean = false,
@@ -46,6 +48,7 @@ class GroupSettingsViewModel @Inject constructor(
                         it.copy(
                             name = group.name,
                             description = group.description ?: "",
+                            imageUrl = group.imageUrl,
                             isLoading = false
                         )
                     }
@@ -66,6 +69,28 @@ class GroupSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(description = description) }
     }
 
+    fun uploadImage(imageBytes: ByteArray) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingImage = true, error = null) }
+            try {
+                val imageUrl = groupRepository.uploadGroupImage(groupId, imageBytes, "jpg")
+                    ?: error("Could not upload group image")
+                if (!groupRepository.updateGroup(
+                        groupId, _uiState.value.name,
+                        _uiState.value.description.takeIf { it.isNotBlank() }, imageUrl
+                    )
+                ) error("Could not save group image")
+                _uiState.update { it.copy(imageUrl = imageUrl, isUploadingImage = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isUploadingImage = false, error = e.message) }
+            }
+        }
+    }
+
+    fun setImageError(message: String) {
+        _uiState.update { it.copy(error = message) }
+    }
+
     fun saveSettings() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -74,7 +99,7 @@ class GroupSettingsViewModel @Inject constructor(
                     groupId = groupId,
                     name = _uiState.value.name,
                     description = _uiState.value.description.takeIf { it.isNotBlank() },
-                    imageUrl = null // Keeping image un-updated for now
+                    imageUrl = _uiState.value.imageUrl
                 )
                 if (success) {
                     _uiState.update { it.copy(isLoading = false, isSuccess = true) }

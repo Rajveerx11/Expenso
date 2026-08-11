@@ -1,11 +1,14 @@
 package com.expenso.app.ui.screen.groups
 
 import androidx.compose.foundation.layout.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -13,6 +16,8 @@ import com.expenso.app.ui.components.ConfirmationDialog
 import com.expenso.app.ui.components.GlassCard
 import com.expenso.app.ui.theme.DeepIndigo
 import com.expenso.app.ui.theme.RoseRed
+import com.expenso.app.ui.util.compressSelectedImage
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,6 +27,18 @@ fun GroupSettingsScreen(
     onGroupDeleted: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                compressSelectedImage(context, it).fold(
+                    onSuccess = viewModel::uploadImage,
+                    onFailure = { error -> viewModel.setImageError(error.message ?: "Could not process image") }
+                )
+            }
+        }
+    }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSuccess) {
@@ -39,7 +56,7 @@ fun GroupSettingsScreen(
     if (showDeleteConfirm) {
         ConfirmationDialog(
             title = "Delete Group",
-            message = "Are you sure you want to delete this group? This action cannot be undone.",
+            message = "Only an empty group can be deleted. Groups with expenses or settlement history are retained for audit.",
             confirmText = "Delete",
             cancelText = "Cancel",
             onConfirm = {
@@ -79,6 +96,18 @@ fun GroupSettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    OutlinedButton(
+                        onClick = { imagePicker.launch("image/*") },
+                        enabled = !uiState.isUploadingImage,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (uiState.isUploadingImage) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                        } else {
+                            Text(if (uiState.imageUrl == null) "Choose group image" else "Change group image")
+                        }
+                    }
+
                     OutlinedTextField(
                         value = uiState.name,
                         onValueChange = viewModel::updateName,
@@ -110,7 +139,7 @@ fun GroupSettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = !uiState.isLoading,
+                enabled = !uiState.isLoading && !uiState.isUploadingImage,
                 colors = ButtonDefaults.buttonColors(containerColor = DeepIndigo)
             ) {
                 if (uiState.isLoading && !uiState.isDeleted) {
@@ -118,6 +147,10 @@ fun GroupSettingsScreen(
                 } else {
                     Text("Save Changes", fontWeight = FontWeight.Bold)
                 }
+            }
+
+            uiState.error?.let { error ->
+                Text(error, color = RoseRed, style = MaterialTheme.typography.bodyMedium)
             }
             
             Spacer(modifier = Modifier.weight(1f))

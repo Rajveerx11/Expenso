@@ -16,6 +16,10 @@ data class CreateGroupUiState(
     val name: String = "",
     val description: String = "",
     val pendingMembers: List<String> = emptyList(),
+    val imageBytes: ByteArray? = null,
+    val createdGroupId: String? = null,
+    val imageUploaded: Boolean = false,
+    val addedMemberEmails: Set<String> = emptySet(),
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null
@@ -36,6 +40,14 @@ class CreateGroupViewModel @Inject constructor(
 
     fun updateDescription(description: String) {
         _uiState.update { it.copy(description = description) }
+    }
+
+    fun selectImage(imageBytes: ByteArray) {
+        _uiState.update { it.copy(imageBytes = imageBytes, imageUploaded = false, error = null) }
+    }
+
+    fun setImageError(message: String) {
+        _uiState.update { it.copy(error = message) }
     }
     
     fun addPendingMember(email: String) {
@@ -60,17 +72,34 @@ class CreateGroupViewModel @Inject constructor(
             try {
                 val userId = authRepository.getCurrentUserId()
                 if (userId != null) {
-                    val groupId = groupRepository.createGroup(
-                        name = name,
-                        description = _uiState.value.description.takeIf { it.isNotBlank() },
-                        createdBy = userId
-                    )
+                    val groupId = _uiState.value.createdGroupId ?: groupRepository.createGroup(
+                            name = name,
+                            description = _uiState.value.description.takeIf { it.isNotBlank() }
+                        )?.also { createdId ->
+                            _uiState.update { it.copy(createdGroupId = createdId) }
+                        }
                     if (groupId != null) {
-                        // Try to add pending members (best effort)
-                        _uiState.value.pendingMembers.forEach { email ->
-                            try {
-                                groupRepository.addGroupMember(groupId, email)
-                            } catch (_: Exception) { }
+                        if (_uiState.value.createdGroupId != null) {
+                            if (!groupRepository.updateGroup(
+                                groupId,
+                                _uiState.value.name,
+                                _uiState.value.description.takeIf { it.isNotBlank() },
+                                null
+                            )) error("Could not synchronize the group details")
+                        }
+                        _uiState.value.imageBytes?.takeUnless { _uiState.value.imageUploaded }?.let { bytes ->
+                            val imageUrl = groupRepository.uploadGroupImage(groupId, bytes, "jpg")
+                                ?: error("Group created, but the image upload failed")
+                            if (!groupRepository.updateGroup(groupId, name, _uiState.value.description, imageUrl)) {
+                                error("Group created, but its image could not be saved")
+                            }
+                            _uiState.update { it.copy(imageUploaded = true) }
+                        }
+                        _uiState.value.pendingMembers
+                            .filterNot { it in _uiState.value.addedMemberEmails }
+                            .forEach { email ->
+                            groupRepository.addGroupMember(groupId, email)
+                            _uiState.update { it.copy(addedMemberEmails = it.addedMemberEmails + email) }
                         }
                         _uiState.update { it.copy(isLoading = false, isSuccess = true) }
                     } else {
@@ -80,7 +109,16 @@ class CreateGroupViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, error = "User not logged in") }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message ?: "An error occurred") }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = if (it.createdGroupId == null) {
+                            e.message ?: "An error occurred"
+                        } else {
+                            "Group created. Retry the remaining setup: ${e.message ?: "setup failed"}"
+                        }
+                    )
+                }
             }
         }
     }

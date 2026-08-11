@@ -10,5 +10,6 @@ data class Group(
     val simplifiedDebts: Boolean,
     val createdAt: String,
     val updatedAt: String,
-    val memberCount: Int = 0
+    val memberCount: Int = 0,
+    val currentUserBalance: Double = 0.0
 )
