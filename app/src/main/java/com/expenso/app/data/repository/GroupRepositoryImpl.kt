@@ -14,6 +14,7 @@ import com.expenso.app.domain.model.GroupExpense
 import com.expenso.app.domain.model.GroupMember
 import com.expenso.app.domain.model.ExpenseSplit
 import com.expenso.app.domain.repository.GroupRepository
+import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ import kotlinx.serialization.json.add
 import kotlinx.serialization.json.put
 
 class GroupRepositoryImpl @Inject constructor(
+    private val auth: Auth,
     private val postgrest: Postgrest,
     private val storage: Storage
 ) : GroupRepository {
@@ -93,11 +95,12 @@ class GroupRepositoryImpl @Inject constructor(
 
     override suspend fun createGroup(
         name: String,
-        description: String?,
-        createdBy: String
+        description: String?
     ): String? {
         return withContext(Dispatchers.IO) {
             try {
+                val createdBy = auth.currentUserOrNull()?.id
+                    ?: return@withContext null
                 val groupId = java.util.UUID.randomUUID().toString()
                 
                 // Insert group with client-generated ID
