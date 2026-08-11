@@ -7,6 +7,7 @@ import com.expenso.app.domain.model.Group
 import com.expenso.app.domain.model.GroupBalance
 import com.expenso.app.domain.model.GroupExpense
 import com.expenso.app.domain.model.GroupMember
+import com.expenso.app.domain.model.ExpenseSplit
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.GroupRepository
 import com.expenso.app.domain.repository.SettlementRepository
@@ -24,6 +25,10 @@ data class GroupDetailUiState(
     val members: List<GroupMember> = emptyList(),
     val expenses: List<GroupExpense> = emptyList(),
     val balances: List<GroupBalance> = emptyList(),
+    val selectedExpense: GroupExpense? = null,
+    val selectedExpenseSplits: List<ExpenseSplit> = emptyList(),
+    val isLoadingExpenseDetails: Boolean = false,
+    val isDeletingExpense: Boolean = false,
     val currentUserId: String = "",
     val isAdmin: Boolean = false,
     val selectedTab: Int = 0,
@@ -92,6 +97,53 @@ class GroupDetailViewModel @Inject constructor(
 
     fun refresh() {
         loadGroupDetail()
+    }
+
+    fun showExpenseDetails(expense: GroupExpense) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    selectedExpense = expense,
+                    selectedExpenseSplits = emptyList(),
+                    isLoadingExpenseDetails = true,
+                    error = null
+                )
+            }
+            try {
+                val splits = groupRepository.getExpenseSplits(expense.id)
+                _uiState.update { it.copy(selectedExpenseSplits = splits, isLoadingExpenseDetails = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoadingExpenseDetails = false, error = e.message) }
+            }
+        }
+    }
+
+    fun closeExpenseDetails() {
+        _uiState.update { it.copy(selectedExpense = null, selectedExpenseSplits = emptyList()) }
+    }
+
+    fun deleteSelectedExpense() {
+        val expense = _uiState.value.selectedExpense ?: return
+        if (expense.paidBy != _uiState.value.currentUserId && !_uiState.value.isAdmin) {
+            _uiState.update { it.copy(error = "Only the payer or a group administrator can delete this expense") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeletingExpense = true, error = null) }
+            try {
+                if (!groupRepository.deleteGroupExpense(expense.id)) error("Could not delete expense")
+                _uiState.update {
+                    it.copy(
+                        selectedExpense = null,
+                        selectedExpenseSplits = emptyList(),
+                        isDeletingExpense = false
+                    )
+                }
+                loadGroupDetail()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isDeletingExpense = false, error = e.message) }
+            }
+        }
     }
     
     fun addMemberByEmail(email: String) {

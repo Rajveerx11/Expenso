@@ -35,6 +35,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expenso.app.domain.model.GroupMember
+import com.expenso.app.domain.model.SplitCalculator
 import com.expenso.app.ui.components.AvatarImage
 import com.expenso.app.ui.components.CategoryPicker
 import com.expenso.app.ui.components.GlassCard
@@ -194,16 +195,24 @@ fun AddGroupExpenseScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         val totalAmt = uiState.totalAmount.toDoubleOrNull() ?: 0.0
+                        val previewSplits = runCatching {
+                            SplitCalculator.calculate(
+                                totalInput = uiState.totalAmount,
+                                splitType = uiState.splitType,
+                                selectedUsers = uiState.selectedMembersForSplit.filterValues { it }.keys,
+                                exactAmounts = uiState.exactAmounts,
+                                percentages = uiState.percentages
+                            ).splits.toMap()
+                        }.getOrDefault(emptyMap())
 
                         when(uiState.splitType) {
                             "equal" -> {
-                                val splitAmt = if (selectedCount > 0) totalAmt / selectedCount else 0.0
                                 uiState.members.forEach { member ->
                                     val isSelected = uiState.selectedMembersForSplit[member.userId] == true
                                     MemberEqualRow(
                                         member = member,
                                         isSelected = isSelected,
-                                        amount = if (isSelected) splitAmt else 0.0,
+                                        amount = previewSplits[member.userId] ?: 0.0,
                                         onToggle = { viewModel.toggleMemberSelection(member.userId) }
                                     )
                                 }
@@ -279,6 +288,7 @@ fun AddGroupExpenseScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
+                    enabled = !uiState.isLoading && !uiState.isSuccess,
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
                 ) {
                     if (uiState.isLoading) {

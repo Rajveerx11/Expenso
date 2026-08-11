@@ -30,6 +30,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.expenso.app.domain.model.GroupBalance
 import com.expenso.app.domain.model.GroupExpense
 import com.expenso.app.domain.model.GroupMember
+import com.expenso.app.domain.model.balanceAtCents
+import com.expenso.app.domain.model.netBalanceAtCents
 import com.expenso.app.ui.components.AvatarImage
 import com.expenso.app.ui.components.ConfirmationDialog
 import com.expenso.app.ui.components.EmptyStateView
@@ -72,6 +74,7 @@ fun GroupDetailScreen(
     var addMemberEmail by remember { mutableStateOf("") }
     var showConfirmAddDialog by remember { mutableStateOf(false) }
     var memberToRemove by remember { mutableStateOf<GroupMember?>(null) }
+    var showDeleteExpenseConfirm by remember { mutableStateOf(false) }
 
     // Clear success/error after showing
     LaunchedEffect(uiState.addMemberSuccess) {
@@ -173,6 +176,17 @@ fun GroupDetailScreen(
                                 color = DeepIndigo,
                                 fontWeight = FontWeight.Medium
                             )
+                            val netBalance = netBalanceAtCents(uiState.balances)
+                            Text(
+                                text = when {
+                                    netBalance > 0 -> "You are owed ${currencyFormat.format(netBalance)}"
+                                    netBalance < 0 -> "You owe ${currencyFormat.format(kotlin.math.abs(netBalance))}"
+                                    else -> "You are settled up"
+                                },
+                                fontSize = 13.sp,
+                                color = if (netBalance >= 0) EmeraldGreen else RoseRed,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
@@ -205,7 +219,7 @@ fun GroupDetailScreen(
                 }
 
                 when (uiState.selectedTab) {
-                    0 -> ExpensesList(uiState.expenses, currencyFormat)
+                    0 -> ExpensesList(uiState.expenses, currencyFormat, viewModel::showExpenseDetails)
                     1 -> MembersList(
                         members = uiState.members,
                         isAdmin = uiState.isAdmin,
@@ -342,10 +356,74 @@ fun GroupDetailScreen(
             }
         )
     }
+
+    if (!showDeleteExpenseConfirm) uiState.selectedExpense?.let { expense ->
+        val canDelete = expense.paidBy == uiState.currentUserId || uiState.isAdmin
+        AlertDialog(
+            onDismissRequest = viewModel::closeExpenseDetails,
+            title = { Text(expense.title, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${currencyFormat.format(expense.totalAmount)} · ${expense.category}")
+                    Text("Paid by ${expense.paidByName.ifBlank { "Unknown" }} on ${expense.expenseDate.take(10)}")
+                    expense.note?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                    HorizontalDivider()
+                    Text("Split details", fontWeight = FontWeight.SemiBold)
+                    if (uiState.isLoadingExpenseDetails) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
+                        uiState.selectedExpenseSplits.forEach { split ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(split.userName.ifBlank { "Unknown member" })
+                                Text(currencyFormat.format(split.owedAmount), fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (canDelete) {
+                    TextButton(
+                        onClick = { showDeleteExpenseConfirm = true },
+                        enabled = !uiState.isDeletingExpense
+                    ) { Text("Delete", color = RoseRed) }
+                } else {
+                    TextButton(onClick = viewModel::closeExpenseDetails) { Text("Close") }
+                }
+            },
+            dismissButton = {
+                if (canDelete) TextButton(onClick = viewModel::closeExpenseDetails) { Text("Close") }
+            }
+        )
+    }
+
+    if (showDeleteExpenseConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteExpenseConfirm = false },
+            title = { Text("Delete shared expense?") },
+            text = { Text("This also removes every linked personal transaction and reverses the balances.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteExpenseConfirm = false
+                        viewModel.deleteSelectedExpense()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RoseRed)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteExpenseConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun ExpensesList(expenses: List<GroupExpense>, currencyFormat: NumberFormat) {
+private fun ExpensesList(
+    expenses: List<GroupExpense>,
+    currencyFormat: NumberFormat,
+    onExpenseClick: (GroupExpense) -> Unit
+) {
     if (expenses.isEmpty()) {
         EmptyStateView(
             icon = "🧾",
@@ -358,7 +436,7 @@ private fun ExpensesList(expenses: List<GroupExpense>, currencyFormat: NumberFor
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(expenses) { expense ->
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                GlassCard(modifier = Modifier.fillMaxWidth().clickable { onExpenseClick(expense) }) {
                     Row(
                         modifier = Modifier
                             .padding(16.dp)
@@ -486,7 +564,8 @@ private fun BalancesList(
     currencyFormat: NumberFormat,
     onSettleUp: (String) -> Unit
 ) {
-    if (balances.isEmpty()) {
+    val nonZeroBalances = balances.filter { balanceAtCents(it.balance) != 0.0 }
+    if (nonZeroBalances.isEmpty()) {
         EmptyStateView(
             icon = "🎉",
             title = "All Settled Up!",
@@ -497,8 +576,9 @@ private fun BalancesList(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(balances) { balance ->
-                val isPositive = balance.balance > 0
+            items(nonZeroBalances) { balance ->
+                val amountAtCents = balanceAtCents(balance.balance)
+                val isPositive = amountAtCents > 0
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
@@ -525,19 +605,19 @@ private fun BalancesList(
                                 }
                             }
                             Text(
-                                text = if (isPositive) "is owed" else "owes",
+                                text = if (isPositive) "owes you" else "you owe",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MediumGrey
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = currencyFormat.format(kotlin.math.abs(balance.balance)),
+                                text = currencyFormat.format(kotlin.math.abs(amountAtCents)),
                                 fontWeight = FontWeight.Bold,
                                 color = if (isPositive) EmeraldGreen else RoseRed
                             )
                             // Show "Settle Up" button if current user owes this person
-                            if (!isPositive && balance.userId != currentUserId) {
+                            if (amountAtCents < 0 && balance.userId != currentUserId) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 TextButton(
                                     onClick = { onSettleUp(balance.userId) },
