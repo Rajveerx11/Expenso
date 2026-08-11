@@ -32,8 +32,21 @@ class SignUpViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = authRepository.signUp(email = email.trim(), password = password, fullName = fullName.trim())
             result.fold(
-                onSuccess = {
-                    _uiState.update { it.copy(isLoading = false, isSuccess = true) }
+                onSuccess = { outcome ->
+                    if (outcome == com.expenso.app.domain.model.SignUpOutcome.EMAIL_CONFIRMATION_REQUIRED) {
+                        _uiState.update {
+                            it.copy(isLoading = false, emailConfirmationRequired = true)
+                        }
+                    } else {
+                        val needsOnboarding = authRepository.needsOnboarding()
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isSuccess = true,
+                                needsOnboarding = needsOnboarding
+                            )
+                        }
+                    }
                 },
                 onFailure = { throwable ->
                     _uiState.update {

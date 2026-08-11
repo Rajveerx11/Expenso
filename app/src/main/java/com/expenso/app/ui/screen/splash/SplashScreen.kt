@@ -36,6 +36,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun SplashScreen(
     onNavigateToLogin: () -> Unit,
+    onNavigateToOnboarding: () -> Unit,
     onNavigateToHome: () -> Unit,
     viewModel: SplashViewModel = hiltViewModel()
 ) {
@@ -55,10 +56,10 @@ fun SplashScreen(
         }
         delay(800)
         try {
-            if (viewModel.isLoggedIn()) {
-                onNavigateToHome()
-            } else {
-                onNavigateToLogin()
+            when (viewModel.destination()) {
+                SplashDestination.LOGIN -> onNavigateToLogin()
+                SplashDestination.ONBOARDING -> onNavigateToOnboarding()
+                SplashDestination.HOME -> onNavigateToHome()
             }
         } catch (e: Exception) {
             onNavigateToLogin()

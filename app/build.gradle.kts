@@ -1,3 +1,15 @@
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use(::load)
+    }
+}
+
+val googleWebClientId = providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").orNull
+    ?: localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -22,6 +34,11 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "1.1"
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${googleWebClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        )
     }
 
     buildTypes {
@@ -61,6 +78,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.splashscreen)
     implementation(libs.material)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.compose)

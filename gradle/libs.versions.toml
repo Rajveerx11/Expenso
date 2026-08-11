@@ -1,5 +1,5 @@
 [versions]
-androidGradlePlugin = "8.5.0"
+androidGradlePlugin = "8.6.1"
 androidxCore = "1.13.1"
 androidxLifecycle = "2.8.3"
 androidxActivity = "1.9.0"
@@ -26,6 +26,8 @@ composeMaterial = "1.6.8"
 material = "1.12.0"
 firebaseBom = "33.16.0"
 googleServices = "4.4.2"
+credentials = "1.6.0"
+googleId = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -54,6 +56,9 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 material = { module = "com.google.android.material:material", version.ref = "material" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleId" }
 
 # Supabase
 supabase-bom = { module = "io.github.jan-tennert.supabase:bom", version.ref = "supabase" }

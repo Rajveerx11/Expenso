@@ -1,0 +1,3 @@
+# Copy this entry to the ignored local.properties file.
+# This is the Web OAuth client ID, not a client secret.
+GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com

@@ -71,7 +71,7 @@ import com.expenso.app.ui.theme.White
 
 @Composable
 fun SignUpScreen(
-    onSignUpSuccess: () -> Unit,
+    onSignUpSuccess: (needsOnboarding: Boolean) -> Unit,
     onNavigateToLogin: () -> Unit,
     viewModel: SignUpViewModel = hiltViewModel()
 ) {
@@ -96,11 +96,18 @@ fun SignUpScreen(
 
     LaunchedEffect(uiState) {
         if (uiState.isSuccess) {
-            onSignUpSuccess()
+            onSignUpSuccess(uiState.needsOnboarding)
         }
         uiState.error?.let { error ->
             snackbarHostState.showSnackbar(error)
             viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(uiState.emailConfirmationRequired) {
+        if (uiState.emailConfirmationRequired) {
+            snackbarHostState.showSnackbar("Check your email to confirm your account, then sign in")
+            onNavigateToLogin()
         }
     }
 
