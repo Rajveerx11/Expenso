@@ -27,14 +27,28 @@ import com.expenso.app.ui.theme.*
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import java.util.Locale
+
+internal fun formatInr(amount: Double): String =
+    "₹${String.format(Locale.ROOT, "%.2f", amount)}"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseListScreen(
     onNavigateToAddExpense: (String) -> Unit,
+    onNavigateToEditExpense: (String) -> Unit,
     viewModel: ExpenseListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var selectedExpense by remember { mutableStateOf<com.expenso.app.domain.model.PersonalExpense?>(null) }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
     
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -50,6 +64,7 @@ fun ExpenseListScreen(
     }
     
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent,
         modifier = Modifier.background(
             brush = Brush.verticalGradient(
@@ -99,7 +114,7 @@ fun ExpenseListScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "₹${"%.0f".format(uiState.monthlyIncome)}",
+                            text = formatInr(uiState.monthlyIncome),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = EmeraldGreen
@@ -121,13 +136,32 @@ fun ExpenseListScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "₹${"%.0f".format(uiState.monthlyExpenses)}",
+                            text = formatInr(uiState.monthlyExpenses),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = RoseRed
                         )
                     }
                 }
+            }
+
+            Text(
+                text = "Month net ${formatInr(uiState.monthlyNet)}  ·  Lifetime net ${formatInr(uiState.lifetimeNet)}\n" +
+                    "Lifetime · Income ${formatInr(uiState.lifetimeIncome)} · Expenses ${formatInr(uiState.lifetimeExpenses)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = NeutralMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
+            if (uiState.categoryExpenses.isNotEmpty()) {
+                Text(
+                    text = uiState.categoryExpenses.entries.joinToString("  ·  ") {
+                        "${it.key} ${formatInr(it.value)}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DeepIndigo,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
             }
             
             // Filters
@@ -178,7 +212,7 @@ fun ExpenseListScreen(
                     ) { expense ->
                         ExpenseCard(
                             expense = expense,
-                            onClick = { /* View details */ },
+                            onClick = { selectedExpense = expense },
                             onDelete = { viewModel.deleteExpense(expense.id) },
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
@@ -187,6 +221,39 @@ fun ExpenseListScreen(
             }
         }
         
+    }
+
+    selectedExpense?.let { expense ->
+        AlertDialog(
+            onDismissRequest = { selectedExpense = null },
+            title = { Text(expense.title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${if (expense.type == "income") "Income" else "Expense"} · ${expense.category}")
+                    Text(formatInr(expense.amount), style = MaterialTheme.typography.headlineSmall)
+                    Text(expense.expenseDate.substringBefore('T'))
+                    expense.note?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                    if (expense.sourceGroupExpenseId != null) {
+                        Text("Linked group transaction. Edit or delete it from the group.", color = NeutralMedium)
+                    }
+                }
+            },
+            confirmButton = {
+                if (expense.sourceGroupExpenseId == null) {
+                    TextButton(onClick = {
+                        selectedExpense = null
+                        onNavigateToEditExpense(expense.id)
+                    }) { Text("Edit") }
+                } else {
+                    TextButton(onClick = { selectedExpense = null }) { Text("Close") }
+                }
+            },
+            dismissButton = {
+                if (expense.sourceGroupExpenseId == null) {
+                    TextButton(onClick = { selectedExpense = null }) { Text("Close") }
+                }
+            }
+        )
     }
 }
 

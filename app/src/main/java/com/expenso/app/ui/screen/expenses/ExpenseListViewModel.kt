@@ -3,6 +3,7 @@ package com.expenso.app.ui.screen.expenses
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expenso.app.domain.model.PersonalExpense
+import com.expenso.app.domain.model.ExpenseAnalytics
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
@@ -22,6 +25,11 @@ data class ExpenseListUiState(
     val currentYear: Int = 2024,
     val monthlyIncome: Double = 0.0,
     val monthlyExpenses: Double = 0.0,
+    val monthlyNet: Double = 0.0,
+    val lifetimeIncome: Double = 0.0,
+    val lifetimeExpenses: Double = 0.0,
+    val lifetimeNet: Double = 0.0,
+    val categoryExpenses: Map<String, Double> = emptyMap(),
     val isLoading: Boolean = true,
     val error: String? = null
 )
@@ -34,6 +42,7 @@ class ExpenseListViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ExpenseListUiState())
     val uiState: StateFlow<ExpenseListUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
 
     init {
         val calendar = Calendar.getInstance()
@@ -47,43 +56,46 @@ class ExpenseListViewModel @Inject constructor(
     }
 
     fun loadExpenses() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        val requestedState = _uiState.value
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val userId = authRepository.getCurrentUserId() ?: return@launch
-                val state = _uiState.value
-                
+                val userId = authRepository.getCurrentUserId()
+                    ?: error("Sign in again to view transactions")
                 val expenses = expenseRepository.getPersonalExpensesByMonth(
                     userId = userId, 
-                    year = state.currentYear, 
-                    month = state.currentMonth
+                    year = requestedState.currentYear,
+                    month = requestedState.currentMonth
                 ).sortedByDescending { it.expenseDate }
                 
-                var income = 0.0
-                var expenseTotal = 0.0
+                val allExpenses = expenseRepository.getPersonalExpenses(userId)
+                val monthlyAnalytics = ExpenseAnalytics.from(expenses)
+                val lifetimeAnalytics = ExpenseAnalytics.from(allExpenses)
                 
-                expenses.forEach {
-                    if (it.type == "income") {
-                        income += it.amount
-                    } else if (it.type == "expense") {
-                        expenseTotal += it.amount
-                    }
-                }
-                
-                val filtered = filterExpenses(expenses, state.selectedFilter)
-                
-                _uiState.update {
-                    it.copy(
+                _uiState.update { current ->
+                    if (current.currentMonth != requestedState.currentMonth ||
+                        current.currentYear != requestedState.currentYear
+                    ) current else current.copy(
                         expenses = expenses,
-                        filteredExpenses = filtered,
-                        monthlyIncome = income,
-                        monthlyExpenses = expenseTotal,
+                        filteredExpenses = filterExpenses(expenses, current.selectedFilter),
+                        monthlyIncome = monthlyAnalytics.income,
+                        monthlyExpenses = monthlyAnalytics.expenses,
+                        monthlyNet = monthlyAnalytics.net,
+                        lifetimeIncome = lifetimeAnalytics.income,
+                        lifetimeExpenses = lifetimeAnalytics.expenses,
+                        lifetimeNet = lifetimeAnalytics.net,
+                        categoryExpenses = monthlyAnalytics.categoryExpenses,
                         isLoading = false
                     )
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
-                _uiState.update { 
-                    it.copy(
+                _uiState.update { current ->
+                    if (current.currentMonth != requestedState.currentMonth ||
+                        current.currentYear != requestedState.currentYear
+                    ) current else current.copy(
                         isLoading = false,
                         error = e.message ?: "Failed to load expenses"
                     )
@@ -122,6 +134,10 @@ class ExpenseListViewModel @Inject constructor(
     }
 
     fun deleteExpense(expenseId: String) {
+        if (_uiState.value.expenses.any { it.id == expenseId && it.sourceGroupExpenseId != null }) {
+            _uiState.update { it.copy(error = "Group transactions must be changed from the group") }
+            return
+        }
         viewModelScope.launch {
             try {
                 val success = expenseRepository.deletePersonalExpense(expenseId)
@@ -135,4 +151,6 @@ class ExpenseListViewModel @Inject constructor(
             }
         }
     }
+
+    fun clearError() = _uiState.update { it.copy(error = null) }
 }

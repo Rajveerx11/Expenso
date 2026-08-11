@@ -190,8 +190,11 @@ fun ExpensoNavGraph(
 
             composable(Screen.Expenses.route) {
                 ExpenseListScreen(
-                    onNavigateToAddExpense = {
-                        navController.navigate(Screen.AddExpense.route)
+                    onNavigateToAddExpense = { type ->
+                        navController.navigate(Screen.AddExpense.route + "?type=$type")
+                    },
+                    onNavigateToEditExpense = { expenseId ->
+                        navController.navigate(Screen.EditExpense.createRoute(expenseId))
                     }
                 )
             }
@@ -232,13 +235,17 @@ fun ExpensoNavGraph(
                         defaultValue = "expense"
                     }
                 )
-            ) {
+            ) { backStackEntry ->
                 AddExpenseScreen(
+                    initialType = backStackEntry.arguments?.getString("type") ?: "expense",
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
 
-            composable(Screen.AddExpense.route) {
+            composable(
+                route = Screen.EditExpense.route,
+                arguments = listOf(navArgument("expenseId") { type = NavType.StringType })
+            ) {
                 AddExpenseScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )

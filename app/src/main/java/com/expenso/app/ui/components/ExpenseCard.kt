@@ -55,6 +55,7 @@ fun ExpenseCard(
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = expense.sourceGroupExpenseId == null,
         backgroundContent = {
             val color by animateColorAsState(
                 targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) {
@@ -126,6 +127,13 @@ fun ExpenseCard(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = NeutralMedium
                             )
+                            if (expense.sourceGroupExpenseId != null) {
+                                Text(
+                                    text = "From group · view only",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NeutralMedium
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
