@@ -5,11 +5,13 @@ import com.expenso.app.data.repository.ProfileRepositoryImpl
 import com.expenso.app.data.repository.ExpenseRepositoryImpl
 import com.expenso.app.data.repository.GroupRepositoryImpl
 import com.expenso.app.data.repository.SettlementRepositoryImpl
+import com.expenso.app.data.repository.NotificationRepositoryImpl
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.ProfileRepository
 import com.expenso.app.domain.repository.ExpenseRepository
 import com.expenso.app.domain.repository.GroupRepository
 import com.expenso.app.domain.repository.SettlementRepository
+import com.expenso.app.domain.repository.NotificationRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -39,4 +41,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSettlementRepository(impl: SettlementRepositoryImpl): SettlementRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNotificationRepository(impl: NotificationRepositoryImpl): NotificationRepository
 }

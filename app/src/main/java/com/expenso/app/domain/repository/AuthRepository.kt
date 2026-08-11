@@ -8,5 +8,5 @@ interface AuthRepository {
     suspend fun isLoggedIn(): Boolean
     suspend fun getCurrentUserId(): String?
     suspend fun getCurrentUser(): User?
-    suspend fun signOut()
+    suspend fun signOut(): Result<Unit>
 }
