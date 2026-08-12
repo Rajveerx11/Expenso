@@ -7,6 +7,7 @@ import com.expenso.app.domain.model.User
 import com.expenso.app.domain.repository.AuthRepository
 import com.expenso.app.domain.repository.ExpenseRepository
 import com.expenso.app.data.repository.monthBounds
+import com.expenso.app.data.repository.filterExpensesForMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -127,6 +128,38 @@ class PersonalExpenseFlowTest {
     }
 
     @Test
+    fun `August rows exclude July and September boundaries`() {
+        val rows = listOf(
+            expense("july-end", 10.0, "Food").copy(expenseDate = "2026-07-31"),
+            expense("august-start", 20.0, "Food").copy(expenseDate = "2026-08-01"),
+            expense("august-end", 30.0, "Food").copy(expenseDate = "2026-08-31"),
+            expense("september-start", 40.0, "Food").copy(expenseDate = "2026-09-01")
+        )
+
+        assertEquals(
+            listOf("august-start", "august-end"),
+            filterExpensesForMonth(rows, 2026, 7).map { it.id }
+        )
+        assertEquals(
+            listOf("july-end"),
+            filterExpensesForMonth(rows, 2026, 6).map { it.id }
+        )
+    }
+
+    @Test
+    fun `month filtering accepts timestamp-shaped legacy dates without shifting timezone`() {
+        val rows = listOf(
+            expense("july", 10.0, "Food").copy(expenseDate = "2026-07-31T23:59:59Z"),
+            expense("august", 20.0, "Food").copy(expenseDate = "2026-08-01T00:00:00Z")
+        )
+
+        assertEquals(
+            listOf("august"),
+            filterExpensesForMonth(rows, 2026, 7).map { it.id }
+        )
+    }
+
+    @Test
     fun `latest month wins when an older load is still pending`() = runTest(dispatcher) {
         val repository = FakeExpenseRepository(
             rowsByMonth = mapOf(
@@ -142,6 +175,27 @@ class PersonalExpenseFlowTest {
         assertEquals(1, viewModel.uiState.value.currentMonth)
         assertEquals(listOf("february"), viewModel.uiState.value.expenses.map { it.id })
         assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `changing from July to August replaces rows and totals`() = runTest(dispatcher) {
+        val repository = FakeExpenseRepository(
+            rowsByMonth = mapOf(
+                6 to listOf(expense("july-31", 31.0, "Food").copy(expenseDate = "2026-07-31")),
+                7 to listOf(expense("august-1", 1.0, "Food").copy(expenseDate = "2026-08-01"))
+            )
+        )
+        val viewModel = ExpenseListViewModel(FakeAuthRepository(), repository)
+
+        viewModel.changeMonth(6, 2026)
+        advanceUntilIdle()
+        assertEquals(listOf("july-31"), viewModel.uiState.value.expenses.map { it.id })
+        assertEquals(31.0, viewModel.uiState.value.monthlyExpenses, 0.001)
+
+        viewModel.changeMonth(7, 2026)
+        advanceUntilIdle()
+        assertEquals(listOf("august-1"), viewModel.uiState.value.expenses.map { it.id })
+        assertEquals(1.0, viewModel.uiState.value.monthlyExpenses, 0.001)
     }
 
     @Test
