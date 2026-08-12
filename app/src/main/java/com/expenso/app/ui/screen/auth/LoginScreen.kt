@@ -67,6 +67,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.expenso.app.BuildConfig
 import com.expenso.app.R
 import com.expenso.app.core.auth.GoogleSignInNonce
+import com.expenso.app.core.auth.GoogleSignInConfig
 import com.expenso.app.ui.components.GlassCard
 import com.expenso.app.ui.theme.DeepIndigo
 import com.expenso.app.ui.theme.GradientEnd
@@ -267,10 +268,9 @@ fun LoginScreen(
                             coroutineScope.launch {
                                 googleCredentialLoading = true
                                 try {
-                                    val clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
-                                    check(clientId.isNotBlank()) {
-                                        "Google sign-in is not configured for this build"
-                                    }
+                                    val clientId = GoogleSignInConfig.validatedWebClientId(
+                                        BuildConfig.GOOGLE_WEB_CLIENT_ID
+                                    )
                                     val nonce = GoogleSignInNonce.generate()
                                     val googleOption = GetSignInWithGoogleOption.Builder(clientId)
                                         .setNonce(nonce.hashed)
