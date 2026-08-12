@@ -201,6 +201,6 @@ private class FakeProfileRepository : ProfileRepository {
         fullName: String?,
         avatarUrl: String?,
         upiId: String?
-    ) = true
+    ): User? = null
     override suspend fun uploadAvatar(userId: String, imageBytes: ByteArray, extension: String): String? = null
 }

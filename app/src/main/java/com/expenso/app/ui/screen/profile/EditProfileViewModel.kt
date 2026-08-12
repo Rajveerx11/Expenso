@@ -56,24 +56,29 @@ class EditProfileViewModel @Inject constructor(
                     val avatarUrl = profileRepository.uploadAvatar(userId, imageBytes, extension)
                     if (avatarUrl != null) {
                         // Update profile with new avatar URL
-                        profileRepository.updateProfile(
+                        val updatedUser = profileRepository.updateProfile(
                             userId = userId,
                             fullName = null,
                             avatarUrl = avatarUrl,
                             upiId = null
                         )
-                        // Reload profile to get updated data
-                        val updatedUser = authRepository.getCurrentUser()
-                        _uiState.update {
-                            it.copy(
-                                isUploadingAvatar = false,
-                                user = updatedUser
-                            )
+                        if (updatedUser != null) {
+                            _uiState.update {
+                                it.copy(isUploadingAvatar = false, user = updatedUser)
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(isUploadingAvatar = false, error = "Failed to save avatar")
+                            }
                         }
                     } else {
                         _uiState.update {
                             it.copy(isUploadingAvatar = false, error = "Failed to upload avatar")
                         }
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(isUploadingAvatar = false, error = "Sign in again to update your profile")
                     }
                 }
             } catch (e: Exception) {
@@ -90,18 +95,24 @@ class EditProfileViewModel @Inject constructor(
             try {
                 val userId = authRepository.getCurrentUserId()
                 if (userId != null) {
-                    val success = profileRepository.updateProfile(
+                    val updatedUser = profileRepository.updateProfile(
                         userId = userId,
                         fullName = fullName,
                         avatarUrl = null,
                         upiId = upiId
                     )
-                    if (success) {
-                        _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
+                    if (updatedUser != null) {
+                        _uiState.update {
+                            it.copy(isSaving = false, saveSuccess = true, user = updatedUser)
+                        }
                     } else {
                         _uiState.update {
                             it.copy(isSaving = false, error = "Failed to update profile")
                         }
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(isSaving = false, error = "Sign in again to update your profile")
                     }
                 }
             } catch (e: Exception) {
