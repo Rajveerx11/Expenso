@@ -1,6 +1,7 @@
 package com.expenso.app.ui.screen.auth
 
 import com.expenso.app.core.auth.GoogleSignInNonce
+import com.expenso.app.core.auth.GoogleSignInConfig
 import com.expenso.app.core.auth.OnboardingValidator
 import com.expenso.app.domain.model.User
 import com.expenso.app.domain.model.SignUpOutcome
@@ -148,6 +149,21 @@ class AuthFlowViewModelTest {
         successViewModel.signOut()
         advanceUntilIdle()
         assertTrue(successViewModel.uiState.value.isSignedOut)
+    }
+
+    @Test
+    fun `google client id validation rejects missing and malformed configuration`() {
+        val valid = "123456789-example.apps.googleusercontent.com"
+        assertEquals(valid, GoogleSignInConfig.validatedWebClientId("  $valid  "))
+
+        listOf("", "YOUR_GOOGLE_WEB_CLIENT_ID_HERE", "android-client-id").forEach { value ->
+            val error = runCatching { GoogleSignInConfig.validatedWebClientId(value) }.exceptionOrNull()
+            assertTrue(error is IllegalArgumentException)
+            assertEquals(
+                "Google sign-in is unavailable in this build. Configure GOOGLE_WEB_CLIENT_ID.",
+                error?.message
+            )
+        }
     }
 }
 

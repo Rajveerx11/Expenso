@@ -7,8 +7,27 @@ val localProperties = Properties().apply {
     }
 }
 
-val googleWebClientId = providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").orNull
-    ?: localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")
+val googleWebClientId = sequenceOf(
+    providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").orNull,
+    providers.environmentVariable("GOOGLE_WEB_CLIENT_ID").orNull,
+    localProperties.getProperty("GOOGLE_WEB_CLIENT_ID")
+).filterNotNull().map(String::trim).firstOrNull(String::isNotEmpty).orEmpty()
+
+val validateGoogleSignInReleaseConfig by tasks.registering {
+    inputs.property("googleWebClientId", googleWebClientId)
+    doLast {
+        val configuredClientId = inputs.properties["googleWebClientId"] as String
+        val validClientId = Regex(
+            "^[0-9]+-[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com$"
+        ).matches(configuredClientId)
+        if (!validClientId) {
+            throw GradleException(
+                "A valid GOOGLE_WEB_CLIENT_ID is required for release builds. " +
+                    "Provide it as a Gradle property or environment variable."
+            )
+        }
+    }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -64,6 +83,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateGoogleSignInReleaseConfig)
 }
 
 dependencies {
