@@ -13,10 +13,24 @@ import javax.inject.Inject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.YearMonth
+import java.time.LocalDate
 
 internal fun monthBounds(year: Int, month: Int): Pair<String, String> {
     val start = YearMonth.of(year, month + 1).atDay(1)
     return start.toString() to start.plusMonths(1).toString()
+}
+
+internal fun filterExpensesForMonth(
+    expenses: List<PersonalExpense>,
+    year: Int,
+    month: Int
+): List<PersonalExpense> {
+    val selectedMonth = YearMonth.of(year, month + 1)
+    return expenses.filter { expense ->
+        runCatching {
+            YearMonth.from(LocalDate.parse(expense.expenseDate.substringBefore('T'))) == selectedMonth
+        }.getOrDefault(false)
+    }
 }
 
 class ExpenseRepositoryImpl @Inject constructor(
@@ -58,7 +72,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                         }
                     }
                     .decodeList<PersonalExpenseDto>()
-                response.map { it.toDomain() }
+                filterExpensesForMonth(response.map { it.toDomain() }, year, month)
         }
     }
 
@@ -180,7 +194,8 @@ class ExpenseRepositoryImpl @Inject constructor(
                     }
                     .decodeList<PersonalExpenseDto>()
                     
-                expenses.sumOf { it.amount }
+                filterExpensesForMonth(expenses.map { it.toDomain() }, year, month)
+                    .sumOf { it.amount }
         }
     }
 }
