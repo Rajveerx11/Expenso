@@ -138,16 +138,18 @@ class AuthFlowViewModelTest {
         )
         val failingViewModel = ProfileViewModel(failingRepository, FakeProfileRepository())
         advanceUntilIdle()
-        failingViewModel.signOut()
+        var failingNavigationCalled = false
+        failingViewModel.signOut { failingNavigationCalled = true }
         advanceUntilIdle()
-        assertFalse(failingViewModel.uiState.value.isSignedOut)
+        assertFalse(failingNavigationCalled)
         assertEquals("network error", failingViewModel.uiState.value.error)
 
         val successViewModel = ProfileViewModel(FakeAuthRepository(), FakeProfileRepository())
         advanceUntilIdle()
-        successViewModel.signOut()
+        var successNavigationCalled = false
+        successViewModel.signOut { successNavigationCalled = true }
         advanceUntilIdle()
-        assertTrue(successViewModel.uiState.value.isSignedOut)
+        assertTrue(successNavigationCalled)
     }
 }
 

@@ -211,10 +211,14 @@ private class FakeExpenseRepository(
 }
 
 private class FakeAuthRepository : AuthRepository {
-    override suspend fun signUp(email: String, password: String, fullName: String) = Result.success(Unit)
+    override suspend fun signUp(email: String, password: String, fullName: String) =
+        Result.success(com.expenso.app.domain.model.SignUpOutcome.AUTHENTICATED)
     override suspend fun signIn(email: String, password: String) = Result.success(Unit)
+    override suspend fun signInWithGoogle(idToken: String, nonce: String) = Result.success(Unit)
     override suspend fun isLoggedIn() = true
+    override suspend fun needsOnboarding() = false
+    override suspend fun completeOnboarding(fullName: String, upiId: String?) = Result.success(Unit)
     override suspend fun getCurrentUserId() = "user"
     override suspend fun getCurrentUser(): User? = null
-    override suspend fun signOut() = Unit
+    override suspend fun signOut() = Result.success(Unit)
 }

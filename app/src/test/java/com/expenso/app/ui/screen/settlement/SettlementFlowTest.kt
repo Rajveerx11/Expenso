@@ -102,21 +102,29 @@ private class RecordingSettlementRepository : SettlementRepository {
 }
 
 private class SignedInAuthRepository : AuthRepository {
-    override suspend fun signUp(email: String, password: String, fullName: String) = Result.success(Unit)
+    override suspend fun signUp(email: String, password: String, fullName: String) =
+        Result.success(com.expenso.app.domain.model.SignUpOutcome.AUTHENTICATED)
     override suspend fun signIn(email: String, password: String) = Result.success(Unit)
+    override suspend fun signInWithGoogle(idToken: String, nonce: String) = Result.success(Unit)
     override suspend fun isLoggedIn() = true
+    override suspend fun needsOnboarding() = false
+    override suspend fun completeOnboarding(fullName: String, upiId: String?) = Result.success(Unit)
     override suspend fun getCurrentUserId() = "payer"
     override suspend fun getCurrentUser(): User? = null
-    override suspend fun signOut() = Unit
+    override suspend fun signOut() = Result.success(Unit)
 }
 
 private class SignedOutAuthRepository : AuthRepository {
-    override suspend fun signUp(email: String, password: String, fullName: String) = Result.success(Unit)
+    override suspend fun signUp(email: String, password: String, fullName: String) =
+        Result.success(com.expenso.app.domain.model.SignUpOutcome.AUTHENTICATED)
     override suspend fun signIn(email: String, password: String) = Result.success(Unit)
+    override suspend fun signInWithGoogle(idToken: String, nonce: String) = Result.success(Unit)
     override suspend fun isLoggedIn() = false
+    override suspend fun needsOnboarding() = false
+    override suspend fun completeOnboarding(fullName: String, upiId: String?) = Result.success(Unit)
     override suspend fun getCurrentUserId(): String? = null
     override suspend fun getCurrentUser(): User? = null
-    override suspend fun signOut() = Unit
+    override suspend fun signOut() = Result.success(Unit)
 }
 
 private class BalanceGroupRepository : GroupRepository {
@@ -124,7 +132,7 @@ private class BalanceGroupRepository : GroupRepository {
         listOf(GroupBalance("receiver", "Receiver", null, -10.0))
     override suspend fun getUserGroups(userId: String): List<Group> = emptyList()
     override suspend fun getGroupById(groupId: String): Group? = null
-    override suspend fun createGroup(name: String, description: String?, createdBy: String): String? = null
+    override suspend fun createGroup(name: String, description: String?): String? = null
     override suspend fun updateGroup(groupId: String, name: String, description: String?, imageUrl: String?) = true
     override suspend fun deleteGroup(groupId: String) = true
     override suspend fun getGroupMembers(groupId: String): List<GroupMember> = emptyList()
