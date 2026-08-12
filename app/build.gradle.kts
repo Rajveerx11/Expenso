@@ -10,6 +10,26 @@ val localProperties = Properties().apply {
 val googleWebClientId = providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").orNull
     ?: localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")
 
+val supabaseUrl = "https://rspuqbcgjqezimwwpbzl.supabase.co"
+val supabasePublishableKey = sequenceOf(
+    providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY").orNull,
+    providers.environmentVariable("SUPABASE_PUBLISHABLE_KEY").orNull,
+    localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+).filterNotNull().map(String::trim).firstOrNull(String::isNotEmpty).orEmpty()
+
+val validateSupabaseReleaseConfig by tasks.registering {
+    inputs.property("supabasePublishableKey", supabasePublishableKey)
+    doLast {
+        val key = inputs.properties["supabasePublishableKey"] as String
+        val publishable = Regex("^sb_publishable_[A-Za-z0-9_-]{20,}$").matches(key)
+        if (!publishable) {
+            throw GradleException(
+                "A valid SUPABASE_PUBLISHABLE_KEY is required for release builds."
+            )
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -39,6 +59,12 @@ android {
             "GOOGLE_WEB_CLIENT_ID",
             "\"${googleWebClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\""
         )
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField(
+            "String",
+            "SUPABASE_PUBLISHABLE_KEY",
+            "\"${supabasePublishableKey.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        )
     }
 
     buildTypes {
@@ -64,6 +90,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateSupabaseReleaseConfig)
 }
 
 dependencies {

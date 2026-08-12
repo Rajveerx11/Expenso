@@ -16,6 +16,18 @@ The local configuration contains no credentials. Client builds use only a
 Supabase publishable key. Never put a secret or legacy `service_role` key in
 the Android app.
 
+Android is pinned to `https://rspuqbcgjqezimwwpbzl.supabase.co`. Configure its
+public client key as `SUPABASE_PUBLISHABLE_KEY` using a Gradle property, CI
+environment variable, or ignored `local.properties` (in that precedence
+order). Release builds fail when this value is missing or malformed. The key
+is necessarily distributed inside the APK; RLS remains the authorization
+boundary. Never use `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` in a
+client build.
+
+After merging the credential-removal change, a project owner should rotate the
+previously committed legacy anon key in Supabase, update deployment/CI values,
+and verify login plus RLS-protected reads before revoking the old value.
+
 ## Remote deployment
 
 Link the intended project explicitly, review the diff, then apply migrations:

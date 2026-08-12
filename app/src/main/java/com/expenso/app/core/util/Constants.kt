@@ -1,8 +1,6 @@
 package com.expenso.app.core.util
 
 object Constants {
-    const val SUPABASE_URL = "https://rspuqbcgjqezimwwpbzl.supabase.co"
-    const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzcHVxYmNnanFlemltd3dwYnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDI4OTAsImV4cCI6MjEwMTkxODg5MH0.DpxNbLuq-NzvStb5kw6-hnJB5e28Fz7txHLhLi4zAUQ"
     // TODO: Replace with your Google Web Client ID from Google Cloud Console
     const val GOOGLE_WEB_CLIENT_ID = "YOUR_GOOGLE_WEB_CLIENT_ID_HERE"
 
