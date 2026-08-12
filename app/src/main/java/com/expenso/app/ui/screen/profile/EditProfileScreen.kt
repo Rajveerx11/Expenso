@@ -264,7 +264,7 @@ fun EditProfileScreen(
                     onClick = {
                         viewModel.saveProfile(
                             fullName = fullName.trim(),
-                            upiId = upiId.trim().ifBlank { null }
+                            upiId = upiId.trim()
                         )
                     },
                     modifier = Modifier

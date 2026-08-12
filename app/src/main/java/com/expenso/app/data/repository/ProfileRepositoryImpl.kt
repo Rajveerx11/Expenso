@@ -2,13 +2,15 @@ package com.expenso.app.data.repository
 
 import com.expenso.app.core.util.Constants
 import com.expenso.app.data.dto.ProfileDto
-import com.expenso.app.data.dto.ProfileUpdateDto
 import com.expenso.app.data.mapper.toDomain
 import com.expenso.app.domain.model.User
 import com.expenso.app.domain.repository.ProfileRepository
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 class ProfileRepositoryImpl @Inject constructor(
@@ -36,22 +38,24 @@ class ProfileRepositoryImpl @Inject constructor(
         fullName: String?,
         avatarUrl: String?,
         upiId: String?
-    ): Boolean {
+    ): User? {
         return try {
-            val update = ProfileUpdateDto(
-                fullName = fullName,
-                avatarUrl = avatarUrl,
-                upiId = upiId,
-                updatedAt = Clock.System.now().toString()
-            )
+            val update = buildJsonObject {
+                fullName?.let { put("full_name", it.trim()) }
+                avatarUrl?.let { put("avatar_url", it) }
+                when {
+                    upiId == "" -> put("upi_id", JsonNull)
+                    upiId != null -> put("upi_id", upiId.trim())
+                }
+            }
             postgrest["profiles"].update(update) {
+                select()
                 filter {
                     eq("id", userId)
                 }
-            }
-            true
+            }.decodeSingleOrNull<ProfileDto>()?.toDomain()
         } catch (e: Exception) {
-            false
+            null
         }
     }
 
@@ -61,7 +65,7 @@ class ProfileRepositoryImpl @Inject constructor(
             storage[Constants.AVATARS_BUCKET].upload(path, imageBytes) {
                 upsert = true
             }
-            storage[Constants.AVATARS_BUCKET].publicUrl(path)
+            storage[Constants.AVATARS_BUCKET].publicUrl(path) + "?v=${Clock.System.now().toEpochMilliseconds()}"
         } catch (e: Exception) {
             null
         }

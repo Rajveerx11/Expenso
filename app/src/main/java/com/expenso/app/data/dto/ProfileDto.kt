@@ -22,15 +22,3 @@ data class ProfileDto(
     @SerialName("updated_at")
     val updatedAt: String? = null
 )
-
-@Serializable
-data class ProfileUpdateDto(
-    @SerialName("full_name")
-    val fullName: String? = null,
-    @SerialName("avatar_url")
-    val avatarUrl: String? = null,
-    @SerialName("upi_id")
-    val upiId: String? = null,
-    @SerialName("updated_at")
-    val updatedAt: String? = null
-)
