@@ -1,7 +1,5 @@
 package com.expenso.app.data.repository
 
-import com.expenso.app.data.dto.CreateGroupDto
-import com.expenso.app.data.dto.CreateGroupMemberDto
 import com.expenso.app.data.dto.GroupDto
 import com.expenso.app.data.dto.GroupMemberWithProfileDto
 import com.expenso.app.data.dto.GroupExpenseDto
@@ -34,48 +32,18 @@ class GroupRepositoryImpl @Inject constructor(
 ) : GroupRepository {
 
     override suspend fun getUserGroups(userId: String): List<Group> {
-        return try {
-            withContext(Dispatchers.IO) {
-                // First try via group_members
-                val memberDtos = try {
-                    postgrest["group_members"].select {
-                        filter { eq("user_id", userId) }
-                    }.decodeList<com.expenso.app.data.dto.GroupMemberDto>()
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                
-                val groupIdsFromMembers = memberDtos.map { it.groupId }
-                
-                // Also get groups where user is the creator (fallback)
-                val createdGroups = try {
-                    postgrest["groups"].select {
-                        filter { eq("created_by", userId) }
-                    }.decodeList<GroupDto>()
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                
-                val memberGroups = if (groupIdsFromMembers.isNotEmpty()) {
-                    try {
-                        postgrest["groups"].select {
-                            filter { isIn("id", groupIdsFromMembers) }
-                        }.decodeList<GroupDto>()
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                } else {
-                    emptyList()
-                }
-                
-                // Combine and deduplicate
-                (memberGroups + createdGroups)
-                    .distinctBy { it.id }
+        return withContext(Dispatchers.IO) {
+            val currentUserId = auth.currentUserOrNull()?.id
+                ?: error("Sign in again to load your groups")
+            require(currentUserId == userId) { "Cannot load groups for another user" }
+
+            try {
+                postgrest.rpc("list_user_groups")
+                    .decodeList<GroupDto>()
                     .map { it.toDomain() }
+            } catch (e: Exception) {
+                throw IllegalStateException("Could not load groups. Please try again.", e)
             }
-        } catch (e: Exception) {
-            android.util.Log.e("GroupRepo", "getUserGroups failed: ${e.message}", e)
-            emptyList()
         }
     }
 
@@ -98,38 +66,14 @@ class GroupRepositoryImpl @Inject constructor(
         description: String?
     ): String? {
         return withContext(Dispatchers.IO) {
-            try {
-                val createdBy = auth.currentUserOrNull()?.id
-                    ?: return@withContext null
-                val groupId = java.util.UUID.randomUUID().toString()
-                
-                // Insert group with client-generated ID
-                postgrest["groups"].insert(buildJsonObject {
-                    put("id", groupId)
-                    put("name", name)
-                    if (description != null) put("description", description)
-                    put("created_by", createdBy)
-                    put("default_currency", "INR")
-                    put("simplified_debts", true)
-                })
-                
-                // Try to add creator as admin member - separate try-catch
-                try {
-                    postgrest["group_members"].insert(buildJsonObject {
-                        put("group_id", groupId)
-                        put("user_id", createdBy)
-                        put("role", "admin")
-                    })
-                } catch (memberException: Exception) {
-                    android.util.Log.e("GroupRepo", "Failed to add creator as member: ${memberException.message}", memberException)
-                    // Group was still created, don't fail
+            auth.currentUserOrNull()?.id ?: error("Sign in again to create a group")
+            postgrest.rpc(
+                "create_group_with_admin",
+                parameters = buildJsonObject {
+                    put("name_param", name)
+                    description?.let { put("description_param", it) }
                 }
-                
-                groupId
-            } catch (e: Exception) {
-                android.util.Log.e("GroupRepo", "createGroup failed: ${e.message}", e)
-                null
-            }
+            ).decodeSingle<String>()
         }
     }
 
