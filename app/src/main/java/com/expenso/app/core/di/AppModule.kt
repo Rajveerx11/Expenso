@@ -2,7 +2,8 @@ package com.expenso.app.core.di
 
 import android.content.Context
 import androidx.credentials.CredentialManager
-import com.expenso.app.core.util.Constants
+import com.expenso.app.BuildConfig
+import com.expenso.app.core.config.SupabaseConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,9 +33,13 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSupabaseClient(): SupabaseClient {
+        val config = SupabaseConfig.validate(
+            url = BuildConfig.SUPABASE_URL,
+            publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
+        )
         return createSupabaseClient(
-            supabaseUrl = Constants.SUPABASE_URL,
-            supabaseKey = Constants.SUPABASE_ANON_KEY
+            supabaseUrl = config.url,
+            supabaseKey = config.publishableKey
         ) {
             install(Auth)
             install(Postgrest)

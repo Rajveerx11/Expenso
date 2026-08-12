@@ -13,5 +13,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+.env
+.env.*
+*.pem
+*.key
+google-services.json
+*service-account*.json
+*.apk
 /.kotlin/
 __pycache__/
