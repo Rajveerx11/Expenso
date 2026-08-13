@@ -24,7 +24,9 @@ jobs:
       - name: Start isolated Supabase stack
         run: supabase start
       - name: Run migration and pgTAP tests
-        run: supabase test db supabase/tests/profile_privacy_flow.sql supabase/tests/personal_finance_flow.sql supabase/tests/personal_finance_concurrency_flow.sql
+        run: supabase test db supabase/tests/profile_privacy_flow.sql supabase/tests/personal_finance_flow.sql
+      - name: Run personal-finance concurrency tests
+        run: bash supabase/tests/personal_finance_concurrency.sh "$(supabase status -o json | jq -r '.DB_URL')"
 
   quality:
     runs-on: ubuntu-latest
