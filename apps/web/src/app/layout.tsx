@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { connection } from 'next/server';
 import './globals.css';
 import '../styles/globals.css';
 import { Providers } from '@/components/Providers';
@@ -41,11 +42,12 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await connection();
   return (
     <html lang="en" className={inter.variable}>
       <body>
