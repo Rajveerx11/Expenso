@@ -24,7 +24,7 @@ jobs:
       - name: Start isolated Supabase stack
         run: supabase start
       - name: Run migration and pgTAP tests
-        run: supabase test db
+        run: supabase test db supabase/tests/profile_privacy_flow.sql
 
   quality:
     runs-on: ubuntu-latest
