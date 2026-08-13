@@ -64,12 +64,20 @@ The public RPC remains callable by pre-auth routes, but rejects callers without 
 | GET/POST | `/api/v1/expenses` | Yes | Page or create personal transactions. |
 | GET | `/api/v1/expenses/analytics` | Yes | Monthly, lifetime, and category analytics. |
 | GET/PATCH/DELETE | `/api/v1/expenses/{expenseId}` | Yes | Read or mutate one owned manual transaction. |
+| GET/POST | `/api/v1/groups` | Yes | Page memberships or create group+admin atomically. |
+| GET/PATCH/DELETE | `/api/v1/groups/{groupId}` | Yes | Member detail or admin settings/safe deletion. |
+| GET/POST | `/api/v1/groups/{groupId}/members` | Yes | Narrow member list or exact-email admin add. |
+| DELETE | `/api/v1/groups/{groupId}/members/{userId}` | Yes | Debt-checked admin removal. |
+| POST | `/api/v1/groups/{groupId}/image/upload-ticket` | Yes | Admin-scoped image upload ticket. |
+| POST | `/api/v1/groups/{groupId}/image/complete` | Yes | Verify and attach group image. |
 
 Every JSON response uses the request-ID-bearing envelope defined in the master blueprint. English messages are for people; clients branch only on stable error codes.
 
 Signup, login, and Google-start routes use a durable Supabase-backed rate limiter keyed by an HMAC of the normalized identity and platform-provided client address. Raw email/IP values are not stored. Provider 429 and 5xx failures remain distinct stable API errors and expose `Retry-After` when the application limiter knows it.
 
 Personal transaction creation requires a 16–128 character `Idempotency-Key` header. The database serializes matching keys, stores the original response privately for 24 hours, replays identical requests, and rejects changed payloads. Create/update/delete and profile aggregate recalculation commit atomically. Group-linked ledger rows remain readable but cannot be edited or deleted through personal routes.
+
+Group listing/detail and member-directory functions derive membership from the verified session. The member directory exposes no UPI value or profile financial aggregates. Only admins can edit group identity, add/remove members, or upload images. Member removal rejects unresolved balances, pending settlements, and sole-admin loss; group deletion preserves all financial history.
 
 ## Checks
 

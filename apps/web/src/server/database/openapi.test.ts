@@ -43,4 +43,14 @@ describe('foundation OpenAPI contract', () => {
     expect(spec).toContain('PersonalTransactionCreateResponse');
     expect(spec).toContain("nextCursor: {type: [string, 'null']}");
   });
+
+  it('documents group lifecycle, members, and direct image upload', () => {
+    expect(spec).toContain('/v1/groups/{groupId}/members/{userId}:');
+    expect(spec).toContain('/v1/groups/{groupId}/image/upload-ticket:');
+    expect(spec).toContain('GroupMemberListResponse');
+    expect(spec).toContain('GroupImageTicketResponse');
+    expect(spec).toContain('bucket: {type: string, const: group-images}');
+    expect(spec.match(/'429': \{\$ref: '#\/components\/responses\/RateLimited'\}/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(spec.match(/'503': \{\$ref: '#\/components\/responses\/DependencyUnavailable'\}/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
+  });
 });

@@ -254,6 +254,8 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
   /v1/expenses/analytics:
     get:
@@ -322,6 +324,120 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/groups:
+    get:
+      operationId: listGroups
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+      responses:
+        '200': {description: Paged current-user groups, content: {application/json: {schema: {$ref: '#/components/schemas/GroupListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    post:
+      operationId: createGroup
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupCreate'}}}
+      responses:
+        '201': {description: Group and creator-admin membership created atomically, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: getGroup
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Member-authorized group summary, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateGroup
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupPatch'}}}
+      responses:
+        '200': {description: Admin-updated group, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    delete:
+      operationId: deleteGroup
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Empty history-free group deleted, content: {application/json: {schema: {$ref: '#/components/schemas/GroupDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/groups/{groupId}/members:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupMembers
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Narrow group member directory, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: addGroupMember
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberAdd'}}}
+      responses:
+        '201': {description: Exact registered email added by admin, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/members/{userId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/UserId'}]
+    delete:
+      operationId: removeGroupMember
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Debt-free member removed by admin, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/groups/{groupId}/image/upload-ticket:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    post:
+      operationId: createGroupImageUploadTicket
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AvatarTicketRequest'}}}}
+      responses:
+        '201': {description: Admin-scoped direct upload ticket, content: {application/json: {schema: {$ref: '#/components/schemas/GroupImageTicketResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/image/complete:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    post:
+      operationId: completeGroupImageUpload
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AvatarCompleteRequest'}}}}
+      responses:
+        '200': {description: Verified object attached by admin, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
 components:
   parameters:
     Month:
@@ -339,6 +455,16 @@ components:
       in: header
       required: true
       schema: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
   securitySchemes:
     cookieSession:
       type: apiKey
@@ -613,6 +739,92 @@ components:
     PersonalCategory:
       type: string
       enum: [Food, Transport, Shopping, Entertainment, Bills, Health, Education, Travel, Groceries, Rent, Salary, Freelance, Other]
+    GroupCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        description: {type: [string, 'null'], maxLength: 500}
+    GroupPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        description: {type: [string, 'null'], maxLength: 500}
+        simplifiedDebts: {type: boolean}
+    GroupSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, imageUrl, createdBy, defaultCurrency, simplifiedDebts, createdAt, updatedAt, memberCount, currentUserBalance, currentUserRole]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: [string, 'null']}
+        imageUrl: {type: [string, 'null']}
+        createdBy: {type: string, format: uuid}
+        defaultCurrency: {type: string, const: INR}
+        simplifiedDebts: {type: boolean}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        memberCount: {type: integer, minimum: 1}
+        currentUserBalance: {$ref: '#/components/schemas/SignedMoney'}
+        currentUserRole: {type: string, enum: [admin, editor]}
+    GroupResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GroupSummary'}}}]
+    GroupListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/GroupSummary'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    GroupDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, required: [deleted, groupId], properties: {deleted: {type: boolean, const: true}, groupId: {type: string, format: uuid}}}}}]
+    GroupMemberAdd:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties: {email: {type: string, format: email, maxLength: 320}}
+    GroupMember:
+      type: object
+      additionalProperties: false
+      required: [membershipId, userId, role, joinedAt, fullName, email, avatarUrl, upiIdAvailable]
+      properties:
+        membershipId: {type: string, format: uuid}
+        userId: {type: string, format: uuid}
+        role: {type: string, enum: [admin, editor]}
+        joinedAt: {type: string, format: date-time}
+        fullName: {type: string}
+        email: {type: string, format: email}
+        avatarUrl: {type: [string, 'null']}
+        upiIdAvailable: {type: boolean}
+    GroupMemberResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GroupMember'}}}]
+    GroupMemberListResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GroupMember'}}}}]
+    GroupMemberDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, required: [removed, groupId, userId], properties: {removed: {type: boolean, const: true}, groupId: {type: string, format: uuid}, userId: {type: string, format: uuid}}}}}]
+    GroupImageTicketResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [bucket, path, token, signedUrl, expiresIn]
+              properties:
+                bucket: {type: string, const: group-images}
+                path: {type: string}
+                token: {type: string}
+                signedUrl: {type: string, format: uri}
+                expiresIn: {type: integer}
     AvatarTicketResponse:
       allOf:
         - {$ref: '#/components/schemas/SuccessEnvelope'}
