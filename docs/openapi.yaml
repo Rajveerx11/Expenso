@@ -1,0 +1,415 @@
+openapi: 3.1.0
+info:
+  title: Expenso same-origin API
+  version: 1.0.0
+  description: Browser API. Supabase SSR session cookies are opaque and managed by the application.
+servers:
+  - url: /api
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Process is alive.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+  /readyz:
+    get:
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: Required dependencies are available.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/csrf:
+    get:
+      operationId: getCsrfToken
+      security: []
+      responses:
+        '200':
+          description: Current double-submit token. The response also sets its matching cookie.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CsrfResponse'}
+  /v1/auth/signup:
+    post:
+      operationId: signUp
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SignUpRequest'}
+      responses:
+        '201':
+          description: Registration accepted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SignUpResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/login:
+    post:
+      operationId: login
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/google:
+    post:
+      operationId: beginGoogleOAuth
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                next: {type: string, maxLength: 500}
+      responses:
+        '200':
+          description: Allowlisted provider authorization URL.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GoogleOAuthResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false}
+      responses:
+        '200':
+          description: Local session ended.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LogoutResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/me:
+    get:
+      operationId: getCurrentProfile
+      security:
+        - cookieSession: []
+      responses:
+        '200':
+          description: Current profile.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProfileResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+    patch:
+      operationId: updateCurrentProfile
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProfilePatch'}
+      responses:
+        '200':
+          description: Updated profile.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProfileResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/me/avatar/upload-ticket:
+    post:
+      operationId: createAvatarUploadTicket
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AvatarTicketRequest'}
+      responses:
+        '201':
+          description: Scoped direct-upload URL and token.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AvatarTicketResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/me/avatar/complete:
+    post:
+      operationId: completeAvatarUpload
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AvatarCompleteRequest'}
+      responses:
+        '200':
+          description: Verified avatar attached to the profile.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProfileResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+components:
+  securitySchemes:
+    cookieSession:
+      type: apiKey
+      in: header
+      name: Cookie
+      description: Opaque, project-prefixed, possibly chunked Supabase SSR cookies managed by the browser. Client code must not construct this header.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: x-csrf-token
+      description: Double-submit token returned by GET /v1/auth/csrf. Required with exact same-origin requests for every mutation.
+  schemas:
+    SignUpRequest:
+      type: object
+      additionalProperties: false
+      required: [fullName, email, password]
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 100}
+        email: {type: string, format: email, maxLength: 320}
+        password: {type: string, minLength: 8, maxLength: 128}
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: {type: string, format: email, maxLength: 320}
+        password: {type: string, minLength: 1, maxLength: 128}
+    ProfilePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 100}
+        upiId:
+          anyOf:
+            - {type: string, minLength: 3, maxLength: 256}
+            - {type: 'null'}
+    AvatarTicketRequest:
+      type: object
+      additionalProperties: false
+      required: [contentType, sizeBytes]
+      properties:
+        contentType: {type: string, enum: [image/jpeg, image/png, image/webp]}
+        sizeBytes: {type: integer, minimum: 1, maximum: 5242880}
+    AvatarCompleteRequest:
+      type: object
+      additionalProperties: false
+      required: [path]
+      properties:
+        path: {type: string, minLength: 1, maxLength: 512}
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [id, email, fullName, avatarUrl, upiId, totalIncome, totalBalance, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        fullName: {type: string}
+        avatarUrl: {type: [string, 'null']}
+        upiId: {type: [string, 'null']}
+        totalIncome: {type: string, pattern: '^\\d{1,10}\\.\\d{2}$'}
+        totalBalance: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    StatusResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [ok, ready]}
+    CsrfResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [csrfToken]
+              properties:
+                csrfToken: {type: string}
+    SignUpResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [userId, emailConfirmationRequired]
+              properties:
+                userId: {type: string, format: uuid}
+                emailConfirmationRequired: {type: boolean}
+    LoginResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [userId]
+              properties:
+                userId: {type: string, format: uuid}
+    GoogleOAuthResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: {type: string, format: uri}
+    LogoutResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [signedOut]
+              properties:
+                signedOut: {type: boolean, const: true}
+    ProfileResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {$ref: '#/components/schemas/Profile'}
+    AvatarTicketResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [bucket, path, token, signedUrl, expiresIn]
+              properties:
+                bucket: {type: string, const: avatars}
+                path: {type: string}
+                token: {type: string}
+                signedUrl: {type: string, format: uri}
+                expiresIn: {type: integer}
+    SuccessEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: {}
+        meta:
+          type: object
+          required: [requestId]
+          properties:
+            requestId: {type: string}
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId, retryable]
+          properties:
+            code: {$ref: '#/components/schemas/ApiErrorCode'}
+            message: {type: string}
+            requestId: {type: string}
+            retryable: {type: boolean}
+            fieldErrors:
+              type: object
+              additionalProperties:
+                type: array
+                items: {type: string}
+    ApiErrorCode:
+      type: string
+      enum:
+        - AUTH_REQUIRED
+        - FORBIDDEN
+        - NOT_FOUND
+        - VALIDATION_ERROR
+        - CONFLICT
+        - MEMBER_ALREADY_EXISTS
+        - REGISTERED_USER_NOT_FOUND
+        - UNRESOLVED_MEMBER_DEBT
+        - GROUP_HISTORY_RETAINED
+        - PENDING_SETTLEMENT_EXISTS
+        - SETTLEMENT_EXCEEDS_BALANCE
+        - SETTLEMENT_CHANGED
+        - LINKED_TRANSACTION_READ_ONLY
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_REUSED
+        - RATE_LIMITED
+        - DEPENDENCY_UNAVAILABLE
+        - INTERNAL_ERROR
+  responses:
+    AuthRequired:
+      description: Missing or invalid session.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Forbidden:
+      description: Same-origin, CSRF, or authorization check failed.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    NotFound:
+      description: Entity absent or hidden by policy.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    ValidationError:
+      description: Invalid fields.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    RateLimited:
+      description: Durable or provider rate limit exceeded. Retry-After is returned when known.
+      headers:
+        Retry-After:
+          schema: {type: integer, minimum: 1}
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    DependencyUnavailable:
+      description: Required dependency is temporarily unavailable.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}

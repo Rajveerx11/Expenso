@@ -13,7 +13,6 @@ class NotificationContractTest(unittest.TestCase):
     def setUpClass(cls):
         cls.sql = MIGRATION.read_text(encoding="utf-8").lower()
         cls.edge = FUNCTION.read_text(encoding="utf-8")
-        cls.manifest = MANIFEST.read_text(encoding="utf-8")
 
     def test_inbox_is_private_and_deduplicated(self):
         self.assertIn("unique (recipient_id, event_key)", self.sql)
@@ -46,9 +45,12 @@ class NotificationContractTest(unittest.TestCase):
         self.assertIn('status: "sent_to_all_valid_devices"', self.edge)
 
     def test_android_declares_fcm_service_and_deep_links(self):
-        self.assertIn("com.google.firebase.MESSAGING_EVENT", self.manifest)
+        if not MANIFEST.exists():
+            self.skipTest("Legacy Android client was replaced by the web application")
+        manifest = MANIFEST.read_text(encoding="utf-8")
+        self.assertIn("com.google.firebase.MESSAGING_EVENT", manifest)
         for host in ("group", "settlement", "notifications"):
-            self.assertIn(f'android:host="{host}"', self.manifest)
+            self.assertIn(f'android:host="{host}"', manifest)
 
 
 if __name__ == "__main__":

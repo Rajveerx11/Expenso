@@ -1,0 +1,73 @@
+import 'server-only';
+import { z } from 'zod';
+
+const urlSchema = z.url().refine((value) => value.startsWith('https://') || value.startsWith('http://localhost:'), {
+  message: 'Expected HTTPS URL or localhost.',
+});
+
+export class ConfigurationError extends Error {
+  constructor(message = 'Application configuration is unavailable.') {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+
+export interface PublicRuntimeConfig {
+  supabaseUrl: string;
+  supabasePublishableKey: string;
+  siteUrl: string;
+}
+
+function required(name: string, value: string | undefined): string {
+  if (!value?.trim()) throw new ConfigurationError(`Missing ${name}.`);
+  return value.trim();
+}
+
+function parseUrl(name: string, value: string | undefined): string {
+  const parsed = urlSchema.safeParse(required(name, value));
+  if (!parsed.success) throw new ConfigurationError(`Invalid ${name}.`);
+  return new URL(parsed.data).origin;
+}
+
+export function getRuntimeConfig(): PublicRuntimeConfig {
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  return {
+    supabaseUrl: parseUrl('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
+    supabasePublishableKey: required('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', publishableKey),
+    siteUrl: parseUrl('NEXT_PUBLIC_SITE_URL', process.env.NEXT_PUBLIC_SITE_URL),
+  };
+}
+
+export function getAllowedOrigins(): ReadonlySet<string> {
+  const { siteUrl } = getRuntimeConfig();
+  const configured = (process.env.APP_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .map((origin) => {
+      const parsed = urlSchema.safeParse(origin);
+      if (!parsed.success) throw new ConfigurationError('Invalid APP_ALLOWED_ORIGINS entry.');
+      return new URL(parsed.data).origin;
+    });
+
+  const origins = new Set([siteUrl, ...configured]);
+  if (process.env.NODE_ENV !== 'production') {
+    origins.add('http://localhost:3000');
+    origins.add('http://127.0.0.1:3000');
+  }
+  return origins;
+}
+
+export function getRateLimitSalt(): string {
+  const salt = required('RATE_LIMIT_SALT', process.env.RATE_LIMIT_SALT);
+  if (salt.length < 32) throw new ConfigurationError('RATE_LIMIT_SALT must be at least 32 characters.');
+  return salt;
+}
+
+export function getRateLimitSecret(): string {
+  const secret = required('RATE_LIMIT_SECRET', process.env.RATE_LIMIT_SECRET);
+  if (secret.length < 32) throw new ConfigurationError('RATE_LIMIT_SECRET must be at least 32 characters.');
+  return secret;
+}

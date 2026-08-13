@@ -1,10 +1,12 @@
 import { ReactNode } from 'react';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar';
-import { MOCK_PROFILE } from '@/lib/mockData';
+import { requirePageUser } from '@/server/auth/session';
+import { getProfile } from '@/server/profile/profile-service';
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const profile = MOCK_PROFILE;
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const { client, userId } = await requirePageUser();
+  const profile = await getProfile(client, userId);
   return (
     <div style={{ display: 'flex', minHeight: '100dvh', background: 'var(--color-snow)' }}>
       {/* Desktop Sidebar */}

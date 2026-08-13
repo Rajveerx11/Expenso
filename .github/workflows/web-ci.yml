@@ -11,6 +11,21 @@ permissions:
   contents: read
 
 jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
+      - name: Start isolated Supabase stack
+        run: supabase start
+      - name: Run migration and pgTAP tests
+        run: supabase test db
+
   quality:
     runs-on: ubuntu-latest
     defaults:
@@ -31,5 +46,12 @@ jobs:
         run: npm run lint
       - name: Type-check
         run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Database contract tests
+        working-directory: .
+        run: python -m unittest discover -s supabase/tests -p 'test_*.py'
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
       - name: Build
         run: npm run build

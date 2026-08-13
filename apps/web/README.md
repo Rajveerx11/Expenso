@@ -14,7 +14,8 @@ Run the complete baseline checks with:
 ```bash
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
 
-Application source lives in `src/app`, reusable UI in `src/components`, and shared contracts in `src/lib`. The repository root contains the product blueprint and architecture handoff.
+Application source lives in `src/app`, reusable UI in `src/components`, shared contracts in `src/shared`, and server-only modules in `src/server`. The repository root contains the product blueprint and architecture handoff.
