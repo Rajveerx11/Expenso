@@ -22,17 +22,23 @@ cleanup() {
   psql "$database_url" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 drop function if exists public.issue3_concurrent_personal_create(text, numeric, text, text, numeric);
 drop function if exists public.issue3_concurrent_group_create(uuid, text, jsonb, numeric);
+drop function if exists public.issue4_remove_member_hold(uuid, uuid, numeric);
+drop function if exists public.issue4_add_member(uuid, text, text);
+drop function if exists public.issue4_update_as_removed_admin(uuid);
 delete from public.group_expenses where group_id in (
   '24000000-0000-0000-0000-000000000097',
-  '24000000-0000-0000-0000-000000000098'
+  '24000000-0000-0000-0000-000000000098',
+  '24000000-0000-0000-0000-000000000096'
 );
 delete from public.group_members where group_id in (
   '24000000-0000-0000-0000-000000000097',
-  '24000000-0000-0000-0000-000000000098'
+  '24000000-0000-0000-0000-000000000098',
+  '24000000-0000-0000-0000-000000000096'
 );
 delete from public.groups where id in (
   '24000000-0000-0000-0000-000000000097',
-  '24000000-0000-0000-0000-000000000098'
+  '24000000-0000-0000-0000-000000000098',
+  '24000000-0000-0000-0000-000000000096'
 );
 delete from auth.users where id in (
   '14000000-0000-0000-0000-000000000097',
@@ -57,10 +63,13 @@ values
 
 insert into public.groups(id, name, created_by)
 values
+  ('24000000-0000-0000-0000-000000000096', 'Concurrent membership', '14000000-0000-0000-0000-000000000097'),
   ('24000000-0000-0000-0000-000000000097', 'Concurrent group A', '14000000-0000-0000-0000-000000000097'),
   ('24000000-0000-0000-0000-000000000098', 'Concurrent group B', '14000000-0000-0000-0000-000000000097');
 insert into public.group_members(group_id, user_id, role)
 values
+  ('24000000-0000-0000-0000-000000000096', '14000000-0000-0000-0000-000000000097', 'admin'),
+  ('24000000-0000-0000-0000-000000000096', '14000000-0000-0000-0000-000000000098', 'editor'),
   ('24000000-0000-0000-0000-000000000097', '14000000-0000-0000-0000-000000000097', 'admin'),
   ('24000000-0000-0000-0000-000000000097', '14000000-0000-0000-0000-000000000098', 'editor'),
   ('24000000-0000-0000-0000-000000000098', '14000000-0000-0000-0000-000000000097', 'admin'),
@@ -109,6 +118,54 @@ begin
   return 'created';
 end;
 $$;
+
+create or replace function public.issue4_remove_member_hold(
+  group_id_param uuid,
+  member_id_param uuid,
+  hold_seconds_param numeric
+)
+returns text language plpgsql security definer set search_path = '' as $$
+begin
+  perform set_config('request.jwt.claim.sub', '14000000-0000-0000-0000-000000000097', true);
+  perform public.remove_group_member_safely(group_id_param, member_id_param);
+  perform pg_sleep(hold_seconds_param);
+  return 'removed';
+end;
+$$;
+
+create or replace function public.issue4_add_member(
+  group_id_param uuid,
+  email_param text,
+  secret_param text
+)
+returns uuid language plpgsql security definer set search_path = '' as $$
+begin
+  perform set_config('request.jwt.claim.sub', '14000000-0000-0000-0000-000000000097', true);
+  return public.add_group_member_by_email(group_id_param, email_param, secret_param);
+end;
+$$;
+
+create or replace function public.issue4_update_as_removed_admin(group_id_param uuid)
+returns text language plpgsql security definer set search_path = '' as $$
+begin
+  perform set_config('request.jwt.claim.sub', '14000000-0000-0000-0000-000000000098', true);
+  perform public.update_group_settings(group_id_param, '{"name":"Removed admin mutation"}'::jsonb);
+  return 'updated';
+exception when sqlstate '42501' then
+  return '42501';
+end;
+$$;
+
+do $$
+begin
+  if not exists (select 1 from vault.decrypted_secrets where name = 'expenso_auth_rate_limit_secret') then
+    perform vault.create_secret(
+      'local-test-rate-limit-secret-1234567890',
+      'expenso_auth_rate_limit_secret'
+    );
+  end if;
+end;
+$$;
 SQL
 
 PGAPPNAME=issue3_personal_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
@@ -155,4 +212,52 @@ if [[ "$group_result" != "-2.00,-2.00|4" ]]; then
   exit 1
 fi
 
-echo "personal finance concurrency checks passed"
+PGAPPNAME=issue4_remove_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "select public.issue4_remove_member_hold('24000000-0000-0000-0000-000000000096','14000000-0000-0000-0000-000000000098',1.5)" >/dev/null &
+remove_a=$!
+wait_for_advisory_lock issue4_remove_a
+membership_start=$(date +%s%3N)
+PGAPPNAME=issue4_add_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "select public.issue4_add_member('24000000-0000-0000-0000-000000000096','group-lock-b@test.local','local-test-rate-limit-secret-1234567890')" >/dev/null &
+add_b=$!
+wait "$add_b"
+membership_elapsed=$(($(date +%s%3N) - membership_start))
+wait "$remove_a"
+if (( membership_elapsed < 1000 )); then
+  echo "concurrent membership add did not wait for serialized removal" >&2
+  exit 1
+fi
+membership_result=$(psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "select count(*) from public.group_members where group_id='24000000-0000-0000-0000-000000000096' and user_id='14000000-0000-0000-0000-000000000098'")
+if [[ "$membership_result" != "1" ]]; then
+  echo "serialized remove/add produced wrong membership result: $membership_result" >&2
+  exit 1
+fi
+
+psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "update public.group_members set role='admin' where group_id='24000000-0000-0000-0000-000000000096' and user_id='14000000-0000-0000-0000-000000000098'" >/dev/null
+PGAPPNAME=issue4_remove_admin_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "select public.issue4_remove_member_hold('24000000-0000-0000-0000-000000000096','14000000-0000-0000-0000-000000000098',1.5)" >/dev/null &
+remove_admin_a=$!
+wait_for_advisory_lock issue4_remove_admin_a
+removed_admin_start=$(date +%s%3N)
+removed_admin_result=$(PGAPPNAME=issue4_removed_admin_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "select public.issue4_update_as_removed_admin('24000000-0000-0000-0000-000000000096')")
+removed_admin_elapsed=$(($(date +%s%3N) - removed_admin_start))
+wait "$remove_admin_a"
+if (( removed_admin_elapsed < 1000 )); then
+  echo "waiting removed admin did not block behind membership revocation" >&2
+  exit 1
+fi
+if [[ "$removed_admin_result" != "42501" ]]; then
+  echo "removed admin retained mutation authority: $removed_admin_result" >&2
+  exit 1
+fi
+group_name=$(psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+  "select name from public.groups where id='24000000-0000-0000-0000-000000000096'")
+if [[ "$group_name" != "Concurrent membership" ]]; then
+  echo "removed admin changed group after revocation: $group_name" >&2
+  exit 1
+fi
+
+echo "personal finance and membership concurrency checks passed"

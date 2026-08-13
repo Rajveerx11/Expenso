@@ -95,6 +95,26 @@ export const personalTransactionListQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
+export const groupCreateSchema = z.strictObject({
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(500).nullable().optional(),
+});
+
+export const groupPatchSchema = z.strictObject({
+  name: z.string().trim().min(1).max(100).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  simplifiedDebts: z.boolean().optional(),
+}).refine((value) => Object.keys(value).length > 0, 'At least one field is required.');
+
+export const groupMemberAddSchema = z.strictObject({
+  email: z.string().trim().toLowerCase().pipe(z.email().max(320)),
+});
+
+export const groupListQuerySchema = z.strictObject({
+  cursor: z.string().min(1).max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
 export const profilePatchSchema = z
   .object({
     fullName: z.string().trim().min(1).max(100).optional(),
@@ -128,3 +148,6 @@ export const avatarTicketSchema = z.object({
 export const avatarCompleteSchema = z.object({
   path: z.string().min(1).max(512),
 }).strict();
+
+export const groupImageTicketSchema = avatarTicketSchema;
+export const groupImageCompleteSchema = avatarCompleteSchema;
