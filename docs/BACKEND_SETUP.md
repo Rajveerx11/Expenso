@@ -60,10 +60,16 @@ The public RPC remains callable by pre-auth routes, but rejects callers without 
 | GET/PATCH | `/api/v1/me` | Yes | Read/update the session profile. |
 | POST | `/api/v1/me/avatar/upload-ticket` | Yes | Create a scoped direct-upload ticket. |
 | POST | `/api/v1/me/avatar/complete` | Yes | Verify and attach an uploaded avatar. |
+| GET | `/api/v1/dashboard?month=YYYY-MM` | Yes | Monthly home, debt, pending, unread, and recent aggregation. |
+| GET/POST | `/api/v1/expenses` | Yes | Page or create personal transactions. |
+| GET | `/api/v1/expenses/analytics` | Yes | Monthly, lifetime, and category analytics. |
+| GET/PATCH/DELETE | `/api/v1/expenses/{expenseId}` | Yes | Read or mutate one owned manual transaction. |
 
 Every JSON response uses the request-ID-bearing envelope defined in the master blueprint. English messages are for people; clients branch only on stable error codes.
 
 Signup, login, and Google-start routes use a durable Supabase-backed rate limiter keyed by an HMAC of the normalized identity and platform-provided client address. Raw email/IP values are not stored. Provider 429 and 5xx failures remain distinct stable API errors and expose `Retry-After` when the application limiter knows it.
+
+Personal transaction creation requires a 16–128 character `Idempotency-Key` header. The database serializes matching keys, stores the original response privately for 24 hours, replays identical requests, and rejects changed payloads. Create/update/delete and profile aggregate recalculation commit atomically. Group-linked ledger rows remain readable but cannot be edited or deleted through personal routes.
 
 ## Checks
 
