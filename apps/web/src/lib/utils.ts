@@ -171,16 +171,16 @@ export function calculateEqualSplit(totalAmount: string, memberIds: string[]): R
   const totalCents = Math.round(parseFloat(totalAmount) * 100);
   const baseCents = Math.floor(totalCents / memberIds.length);
   const remainder = totalCents - baseCents * memberIds.length;
-  
+
   // Sort for determinism
   const sorted = [...memberIds].sort();
   const result: Record<string, string> = {};
-  
+
   sorted.forEach((id, i) => {
     const cents = baseCents + (i < remainder ? 1 : 0);
     result[id] = (cents / 100).toFixed(2);
   });
-  
+
   return result;
 }
 

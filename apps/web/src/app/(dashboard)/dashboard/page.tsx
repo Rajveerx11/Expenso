@@ -51,7 +51,7 @@ export default function DashboardPage() {
             {/* Decorative circles */}
             <div style={{ position: 'absolute', top: -40, right: -20, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
             <div style={{ position: 'absolute', bottom: -30, right: 40, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-            
+
             <p style={{ fontSize: '13px', fontWeight: 500, opacity: 0.8, marginBottom: '6px' }}>August Net Balance</p>
             <div style={{ fontSize: '36px', fontWeight: 800, letterSpacing: '-1px', marginBottom: '20px' }}>
               {formatMoney(monthlyNet)}
