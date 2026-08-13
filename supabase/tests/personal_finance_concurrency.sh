@@ -3,6 +3,21 @@ set -euo pipefail
 
 database_url="${1:?database URL is required}"
 
+wait_for_advisory_lock() {
+  local application_name="$1"
+  local lock_count
+  for _ in {1..100}; do
+    lock_count=$(psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+      "select count(*) from pg_locks locks join pg_stat_activity activity using (pid) where locks.locktype='advisory' and locks.granted and activity.application_name='$application_name' and activity.wait_event='PgSleep'")
+    if (( lock_count > 0 )); then
+      return 0
+    fi
+    sleep 0.05
+  done
+  echo "writer $application_name never acquired its advisory lock" >&2
+  return 1
+}
+
 cleanup() {
   psql "$database_url" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 drop function if exists public.issue3_concurrent_personal_create(text, numeric, text, text, numeric);
@@ -96,17 +111,17 @@ end;
 $$;
 SQL
 
-psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+PGAPPNAME=issue3_personal_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_personal_create('Concurrent income A',100.00,'concurrent-create-key-a',repeat('d',64),1.5)" >/dev/null &
 personal_a=$!
-sleep 0.2
+wait_for_advisory_lock issue3_personal_a
 personal_start=$(date +%s%3N)
-psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+PGAPPNAME=issue3_personal_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_personal_create('Concurrent income B',200.00,'concurrent-create-key-b',repeat('e',64),0)" >/dev/null &
 personal_b=$!
-wait "$personal_a"
 wait "$personal_b"
 personal_elapsed=$(($(date +%s%3N) - personal_start))
+wait "$personal_a"
 if (( personal_elapsed < 1000 )); then
   echo "second personal recalculation did not wait for the user ledger lock" >&2
   exit 1
@@ -118,17 +133,17 @@ if [[ "$personal_result" != "300.00|2" ]]; then
   exit 1
 fi
 
-psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+PGAPPNAME=issue3_group_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_group_create('24000000-0000-0000-0000-000000000097','Opposing order A','[{\"user_id\":\"14000000-0000-0000-0000-000000000097\",\"owed_amount\":1},{\"user_id\":\"14000000-0000-0000-0000-000000000098\",\"owed_amount\":1}]'::jsonb,1.5)" >/dev/null &
 group_a=$!
-sleep 0.2
+wait_for_advisory_lock issue3_group_a
 group_start=$(date +%s%3N)
-psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+PGAPPNAME=issue3_group_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_group_create('24000000-0000-0000-0000-000000000098','Opposing order B','[{\"user_id\":\"14000000-0000-0000-0000-000000000098\",\"owed_amount\":1},{\"user_id\":\"14000000-0000-0000-0000-000000000097\",\"owed_amount\":1}]'::jsonb,0)" >/dev/null &
 group_b=$!
-wait "$group_a"
 wait "$group_b"
 group_elapsed=$(($(date +%s%3N) - group_start))
+wait "$group_a"
 if (( group_elapsed < 1000 )); then
   echo "opposing-order group mutation did not wait for sorted batch locks" >&2
   exit 1
