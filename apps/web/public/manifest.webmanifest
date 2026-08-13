@@ -1,0 +1,11 @@
+{
+  "name": "Expenso",
+  "short_name": "Expenso",
+  "description": "Track. Split. Settle. — Beautifully.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#FAFAFA",
+  "theme_color": "#4F46E5",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"]
+}
