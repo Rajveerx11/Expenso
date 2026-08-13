@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { avatarTicketSchema, loginSchema, moneySchema, profilePatchSchema, signUpSchema } from './contracts';
+import {
+  avatarTicketSchema,
+  loginSchema,
+  moneySchema,
+  personalTransactionCreateSchema,
+  personalTransactionPatchSchema,
+  profilePatchSchema,
+  signUpSchema,
+} from './contracts';
 
 describe('shared API contracts', () => {
   it('accepts canonical money and rejects ambiguous amounts', () => {
@@ -32,5 +40,20 @@ describe('shared API contracts', () => {
     expect(avatarTicketSchema.safeParse({ contentType: 'image/webp', sizeBytes: 1024 }).success).toBe(true);
     expect(avatarTicketSchema.safeParse({ contentType: 'image/svg+xml', sizeBytes: 1024 }).success).toBe(false);
     expect(avatarTicketSchema.safeParse({ contentType: 'image/png', sizeBytes: 5 * 1024 * 1024 + 1 }).success).toBe(false);
+  });
+
+  it('normalizes personal money strings and rejects unknown or empty patches', () => {
+    expect(personalTransactionCreateSchema.parse({
+      title: ' Lunch ',
+      amount: '12.5',
+      category: 'Food',
+      type: 'expense',
+      expenseDate: '2026-08-14',
+    })).toMatchObject({ title: 'Lunch', amount: '12.50' });
+    expect(personalTransactionCreateSchema.safeParse({
+      title: 'Bad', amount: '0', category: 'Unknown', type: 'expense', expenseDate: '2026-08-14',
+    }).success).toBe(false);
+    expect(personalTransactionPatchSchema.safeParse({}).success).toBe(false);
+    expect(personalTransactionPatchSchema.safeParse({ amount: '1.001' }).success).toBe(false);
   });
 });

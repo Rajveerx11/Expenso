@@ -34,4 +34,13 @@ describe('foundation OpenAPI contract', () => {
     expect(spec).toContain('- IDEMPOTENCY_KEY_REUSED');
     expect(spec).toContain('- INTERNAL_ERROR');
   });
+
+  it('documents personal CRUD, dashboard, paging, and idempotency', () => {
+    expect(spec).toContain('/v1/dashboard:');
+    expect(spec).toContain('/v1/expenses/{expenseId}:');
+    expect(spec).toContain('name: Idempotency-Key');
+    expect(spec).toContain('PersonalAnalyticsResponse');
+    expect(spec).toContain('PersonalTransactionCreateResponse');
+    expect(spec).toContain("nextCursor: {type: [string, 'null']}");
+  });
 });

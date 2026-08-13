@@ -193,7 +193,152 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/dashboard:
+    get:
+      operationId: getDashboard
+      security:
+        - cookieSession: []
+      parameters:
+        - {$ref: '#/components/parameters/Month'}
+      responses:
+        '200':
+          description: Monthly home aggregation.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/expenses:
+    get:
+      operationId: listPersonalTransactions
+      security:
+        - cookieSession: []
+      parameters:
+        - {$ref: '#/components/parameters/Month'}
+        - name: type
+          in: query
+          schema: {type: string, enum: [all, income, expense], default: all}
+        - name: cursor
+          in: query
+          schema: {type: string, maxLength: 500}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 30}
+      responses:
+        '200':
+          description: Deterministically paged monthly transactions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionListResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    post:
+      operationId: createPersonalTransaction
+      security:
+        - cookieSession: []
+          csrfToken: []
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PersonalTransactionCreate'}
+      responses:
+        '201':
+          description: Transaction created or same request replayed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionCreateResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /v1/expenses/analytics:
+    get:
+      operationId: getPersonalTransactionAnalytics
+      security:
+        - cookieSession: []
+      parameters:
+        - {$ref: '#/components/parameters/Month'}
+      responses:
+        '200':
+          description: Monthly, lifetime, and category totals.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalAnalyticsResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/expenses/{expenseId}:
+    parameters:
+      - {$ref: '#/components/parameters/ExpenseId'}
+    get:
+      operationId: getPersonalTransaction
+      security:
+        - cookieSession: []
+      responses:
+        '200':
+          description: Authorized transaction.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    patch:
+      operationId: updatePersonalTransaction
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PersonalTransactionPatch'}
+      responses:
+        '200':
+          description: Updated manual transaction.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    delete:
+      operationId: deletePersonalTransaction
+      security:
+        - cookieSession: []
+          csrfToken: []
+      responses:
+        '200':
+          description: Manual transaction deleted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionDeleteResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
 components:
+  parameters:
+    Month:
+      name: month
+      in: query
+      required: true
+      schema: {type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
+    ExpenseId:
+      name: expenseId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
   securitySchemes:
     cookieSession:
       type: apiKey
@@ -254,7 +399,7 @@ components:
         fullName: {type: string}
         avatarUrl: {type: [string, 'null']}
         upiId: {type: [string, 'null']}
-        totalIncome: {type: string, pattern: '^\\d{1,10}\\.\\d{2}$'}
+        totalIncome: {type: string, pattern: '^\d{1,10}\.\d{2}$'}
         totalBalance: {type: string}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
@@ -329,6 +474,145 @@ components:
         - type: object
           properties:
             data: {$ref: '#/components/schemas/Profile'}
+    PersonalTransactionCreate:
+      type: object
+      additionalProperties: false
+      required: [title, amount, category, type, expenseDate]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 120}
+        amount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        type: {type: string, enum: [income, expense]}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+    PersonalTransactionPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: {type: string, minLength: 1, maxLength: 120}
+        amount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        type: {type: string, enum: [income, expense]}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+    PersonalTransaction:
+      type: object
+      additionalProperties: false
+      required: [id, title, amount, category, type, note, sourceGroupExpenseId, expenseDate, createdAt, updatedAt, editable]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        amount: {$ref: '#/components/schemas/Money'}
+        category: {type: string}
+        type: {type: string, enum: [income, expense]}
+        note: {type: [string, 'null']}
+        sourceGroupExpenseId: {type: [string, 'null'], format: uuid}
+        editable: {type: boolean}
+        expenseDate: {type: string, format: date}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    PersonalTransactionResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {$ref: '#/components/schemas/PersonalTransaction'}
+    PersonalTransactionListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: array
+              items: {$ref: '#/components/schemas/PersonalTransaction'}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    PersonalTransactionCreateResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [transaction, replayed]
+              properties:
+                transaction: {$ref: '#/components/schemas/PersonalTransaction'}
+                replayed: {type: boolean}
+    PersonalTransactionDeleteResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [deleted, expenseId]
+              properties:
+                deleted: {type: boolean, const: true}
+                expenseId: {type: string, format: uuid}
+    PersonalAnalyticsResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [month, monthlyIncome, monthlyExpenses, monthlyNet, lifetimeIncome, lifetimeExpenses, lifetimeNet, categoryBreakdown]
+              properties:
+                month: {type: string}
+                monthlyIncome: {$ref: '#/components/schemas/Money'}
+                monthlyExpenses: {$ref: '#/components/schemas/Money'}
+                monthlyNet: {$ref: '#/components/schemas/SignedMoney'}
+                lifetimeIncome: {$ref: '#/components/schemas/Money'}
+                lifetimeExpenses: {$ref: '#/components/schemas/Money'}
+                lifetimeNet: {$ref: '#/components/schemas/SignedMoney'}
+                categoryBreakdown:
+                  type: array
+                  items:
+                    type: object
+                    required: [category, amount, percentage]
+                    properties:
+                      category: {type: string}
+                      amount: {$ref: '#/components/schemas/Money'}
+                      percentage: {type: number, minimum: 0, maximum: 100}
+    DashboardResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [profile, month, monthlyIncome, monthlyExpenses, monthlyNet, totalYouOwe, totalOwedToYou, pendingConfirmationCount, unreadNotificationCount, recentTransactions]
+              properties:
+                profile: {$ref: '#/components/schemas/Profile'}
+                month: {type: string}
+                monthlyIncome: {$ref: '#/components/schemas/Money'}
+                monthlyExpenses: {$ref: '#/components/schemas/Money'}
+                monthlyNet: {$ref: '#/components/schemas/SignedMoney'}
+                totalYouOwe: {$ref: '#/components/schemas/Money'}
+                totalOwedToYou: {$ref: '#/components/schemas/Money'}
+                pendingConfirmationCount: {type: integer, minimum: 0}
+                unreadNotificationCount: {type: integer, minimum: 0}
+                recentTransactions:
+                  type: array
+                  maxItems: 5
+                  items: {$ref: '#/components/schemas/PersonalTransaction'}
+    Money:
+      type: string
+      pattern: '^\d{1,10}\.\d{2}$'
+    SignedMoney:
+      type: string
+      pattern: '^-?\d{1,12}\.\d{2}$'
+    PositiveMoneyInput:
+      type: string
+      pattern: '^\d{1,10}(?:\.\d{1,2})?$'
+    PersonalCategory:
+      type: string
+      enum: [Food, Transport, Shopping, Entertainment, Bills, Health, Education, Travel, Groceries, Rent, Salary, Freelance, Other]
     AvatarTicketResponse:
       allOf:
         - {$ref: '#/components/schemas/SuccessEnvelope'}
@@ -412,4 +696,10 @@ components:
       content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
     DependencyUnavailable:
       description: Required dependency is temporarily unavailable.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Conflict:
+      description: Idempotency conflict or linked transaction is read-only.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    PreconditionRequired:
+      description: Required Idempotency-Key header is missing or invalid.
       content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
