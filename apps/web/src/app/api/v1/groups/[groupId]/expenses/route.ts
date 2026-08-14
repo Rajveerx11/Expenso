@@ -11,6 +11,7 @@ import {
   createGroupExpense,
   listGroupExpenses,
 } from '@/server/shared-expenses/shared-expense-service';
+import { scheduleNotificationDelivery } from '@/server/notifications/delivery';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,7 @@ export async function POST(request: Request, context: Context) {
       await parseJson(request, groupExpenseCreateSchema),
       idempotencyKey,
     );
+    scheduleNotificationDelivery();
     return ok(result, requestId, { status: 201, isPrivate: true });
   } catch (error) {
     return handleRouteError(error, requestId);

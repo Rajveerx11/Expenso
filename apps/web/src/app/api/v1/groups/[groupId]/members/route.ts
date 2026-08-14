@@ -3,6 +3,7 @@ import { requireApiUser } from '@/server/auth/session';
 import { handleRouteError, ok, parseJson, requestIdFor } from '@/server/http/response';
 import { assertMutationRequest } from '@/server/http/security';
 import { addMember, listMembers } from '@/server/groups/group-service';
+import { scheduleNotificationDelivery } from '@/server/notifications/delivery';
 
 export const dynamic = 'force-dynamic';
 interface Context { params: Promise<{ groupId: string }> }
@@ -22,6 +23,8 @@ export async function POST(request: Request, context: Context) {
     assertMutationRequest(request);
     const { client } = await requireApiUser();
     const { email } = await parseJson(request, groupMemberAddSchema);
-    return ok(await addMember(client, await idFor(context), email), requestId, { status: 201, isPrivate: true });
+    const member = await addMember(client, await idFor(context), email);
+    scheduleNotificationDelivery();
+    return ok(member, requestId, { status: 201, isPrivate: true });
   } catch (error) { return handleRouteError(error, requestId); }
 }

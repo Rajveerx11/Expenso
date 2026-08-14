@@ -465,6 +465,152 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/ValidationError'}
         '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupSettlements
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+      responses:
+        '200': {description: Involved group settlements in newest-first keyset order, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    post:
+      operationId: createGroupSettlement
+      security: [{cookieSession: [], csrfToken: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementCreate'}}}}
+      responses:
+        '201': {description: Pending settlement claim; payment remains unconfirmed until receiver action, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementCreateResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements/{settlementId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/SettlementId'}]
+    get:
+      operationId: getGroupSettlement
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Settlement detail visible only to involved group members, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements/{settlementId}/confirm:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/SettlementId'}]
+    post:
+      operationId: confirmGroupSettlement
+      description: Receiver-only. Empty body. Repeating a completed confirmation returns the terminal state.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Confirmed settlement after authoritative balance recheck and oldest-split allocation, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements/{settlementId}/reject:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/SettlementId'}]
+    post:
+      operationId: rejectGroupSettlement
+      description: Receiver-only. Empty body. Repeating a completed rejection returns the terminal state.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Rejected settlement; balances remain unchanged, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Owned inbox in newest-first keyset order, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/notifications/{notificationId}/read:
+    parameters: [{$ref: '#/components/parameters/NotificationId'}]
+    post:
+      operationId: markNotificationRead
+      description: Empty body. Idempotently marks one owned notification read.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Notification marked read, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationReadResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      description: Empty body. Idempotently marks every owned notification read.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Owned notifications marked read, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationsReadAllResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/push-subscriptions:
+    post:
+      operationId: upsertWebPushSubscription
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushSubscriptionRequest'}}}}
+      responses:
+        '201': {description: Owned browser subscription registered without returning endpoint or encryption keys, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushSubscriptionResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/push-subscriptions/{subscriptionId}:
+    parameters: [{$ref: '#/components/parameters/SubscriptionId'}]
+    delete:
+      operationId: disableWebPushSubscription
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Owned subscription disabled, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushSubscriptionDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/notifications/drain:
+    get:
+      operationId: drainWebPushDeliveries
+      security: [{cronBearer: []}]
+      responses:
+        '200': {description: Claimed web-push deliveries processed, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushDrainResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/notifications/deliver:
+    post:
+      operationId: deliverNotificationWebhook
+      security: [{webhookBearer: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationWebhookRequest'}}}}
+      responses:
+        '200': {description: Authoritative pending deliveries processed, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushDrainResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
   /v1/groups/{groupId}/members/{userId}:
     parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/UserId'}]
     delete:
@@ -528,6 +674,21 @@ components:
       in: path
       required: true
       schema: {type: string, format: uuid}
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
   securitySchemes:
     cookieSession:
       type: apiKey
@@ -539,6 +700,14 @@ components:
       in: header
       name: x-csrf-token
       description: Double-submit token returned by GET /v1/auth/csrf. Required with exact same-origin requests for every mutation.
+    cronBearer:
+      type: http
+      scheme: bearer
+      description: Server-managed CRON_SECRET. Never exposed to browser clients.
+    webhookBearer:
+      type: http
+      scheme: bearer
+      description: Server-managed database webhook secret. Never exposed to browser clients.
   schemas:
     SignUpRequest:
       type: object
@@ -961,6 +1130,161 @@ components:
         direction: {type: string, enum: [owes_you, you_owe, settled]}
     GroupBalanceListResponse:
       allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GroupBalance'}}}}]
+    SettlementCreate:
+      type: object
+      additionalProperties: false
+      required: [receiverId, amount]
+      properties:
+        receiverId: {type: string, format: uuid}
+        amount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        transactionRef: {type: [string, 'null'], minLength: 1, maxLength: 200}
+    Settlement:
+      type: object
+      additionalProperties: false
+      required: [id, groupId, payerId, payerName, receiverId, receiverName, amount, status, transactionRef, createdAt, confirmedAt, canRespond]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        payerId: {type: string, format: uuid}
+        payerName: {type: string}
+        receiverId: {type: string, format: uuid}
+        receiverName: {type: string}
+        amount: {$ref: '#/components/schemas/Money'}
+        status: {type: string, enum: [pending_confirmation, confirmed, rejected]}
+        transactionRef: {type: [string, 'null'], maxLength: 200}
+        createdAt: {type: string, format: date-time}
+        confirmedAt: {type: [string, 'null'], format: date-time}
+        canRespond: {type: boolean}
+    SettlementResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/Settlement'}}}]
+    SettlementListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/Settlement'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    SettlementCreateResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [settlement, replayed]
+              properties:
+                settlement: {$ref: '#/components/schemas/Settlement'}
+                replayed: {type: boolean}
+    AppNotification:
+      type: object
+      additionalProperties: false
+      required: [id, type, title, message, groupId, relatedId, href, isRead, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [expense_added, member_added, settlement_request, settlement_confirmed, settlement_rejected]}
+        title: {type: string}
+        message: {type: string}
+        groupId: {type: [string, 'null'], format: uuid}
+        relatedId: {type: [string, 'null'], format: uuid}
+        href:
+          type: string
+          pattern: '^/(?:notifications|groups/[0-9A-Fa-f-]{36}(?:/settlements/[0-9A-Fa-f-]{36})?)$'
+        isRead: {type: boolean}
+        createdAt: {type: string, format: date-time}
+    NotificationListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/AppNotification'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    NotificationReadResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [read, notificationId], properties: {read: {type: boolean, const: true}, notificationId: {type: string, format: uuid}}}}}]
+    NotificationsReadAllResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [read, updatedCount], properties: {read: {type: boolean, const: true}, updatedCount: {type: integer, minimum: 0}}}}}]
+    WebPushSubscriptionRequest:
+      type: object
+      additionalProperties: false
+      required: [endpoint, expirationTime, keys]
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: HTTPS endpoint from a supported browser push service. Private/arbitrary hosts are rejected.
+        expirationTime: {type: [integer, 'null'], minimum: 0, maximum: 8640000000000000, description: Future epoch milliseconds supplied by PushSubscription.}
+        keys:
+          type: object
+          additionalProperties: false
+          required: [p256dh, auth]
+          properties:
+            p256dh: {type: string, minLength: 43, maxLength: 256, pattern: '^[A-Za-z0-9_-]+$'}
+            auth: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$'}
+        userAgent: {type: [string, 'null'], minLength: 1, maxLength: 300}
+    WebPushSubscriptionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, expirationTime, userAgent, createdAt, lastSuccessAt]
+      description: Safe summary. Push endpoint and encryption keys are never returned.
+      properties:
+        id: {type: string, format: uuid}
+        expirationTime: {type: [integer, 'null'], minimum: 0}
+        userAgent: {type: [string, 'null'], maxLength: 300}
+        createdAt: {type: string, format: date-time}
+        lastSuccessAt: {type: [string, 'null'], format: date-time}
+    WebPushSubscriptionResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/WebPushSubscriptionSummary'}}}]
+    WebPushSubscriptionDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [disabled, subscriptionId], properties: {disabled: {type: boolean, const: true}, subscriptionId: {type: string, format: uuid}}}}}]
+    NotificationWebhookRequest:
+      oneOf:
+        - {$ref: '#/components/schemas/CompactNotificationWebhookRequest'}
+        - {$ref: '#/components/schemas/SupabaseNotificationInsertWebhook'}
+    CompactNotificationWebhookRequest:
+      type: object
+      additionalProperties: false
+      required: [notificationId]
+      properties: {notificationId: {type: string, format: uuid}}
+    SupabaseNotificationInsertWebhook:
+      type: object
+      additionalProperties: false
+      required: [type, table, schema, record]
+      properties:
+        type: {type: string, const: INSERT}
+        table: {type: string, const: notifications}
+        schema: {type: string, const: public}
+        record:
+          type: object
+          required: [id]
+          properties: {id: {type: string, format: uuid}}
+          additionalProperties: true
+        old_record: {type: [object, 'null'], additionalProperties: true}
+    WebPushDrainResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [claimed, sent, invalid, retried, failed]
+              properties:
+                claimed: {type: integer, minimum: 0, maximum: 50}
+                sent: {type: integer, minimum: 0, maximum: 50}
+                invalid: {type: integer, minimum: 0, maximum: 50}
+                retried: {type: integer, minimum: 0, maximum: 50}
+                failed: {type: integer, minimum: 0, maximum: 50}
     GroupCreate:
       type: object
       additionalProperties: false

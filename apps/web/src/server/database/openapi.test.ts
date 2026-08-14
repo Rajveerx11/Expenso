@@ -66,4 +66,30 @@ describe('foundation OpenAPI contract', () => {
     expect(spec).toContain("pattern: '^(?=.*[1-9])\\d{1,10}(?:\\.\\d{1,2})?$'");
     expect(spec).toContain("pattern: '^(?=.*[1-9])(?:100(?:\\.0{1,4})?|\\d{1,2}(?:\\.\\d{1,4})?)$'");
   });
+
+  it('documents receiver-confirmed settlements and their stable conflicts', () => {
+    expect(spec).toContain('/v1/groups/{groupId}/settlements/{settlementId}/confirm:');
+    expect(spec).toContain('/v1/groups/{groupId}/settlements/{settlementId}/reject:');
+    expect(spec).toContain('payment remains unconfirmed until receiver action');
+    expect(spec).toContain('SettlementCreateResponse');
+    expect(spec).toContain('SettlementListResponse');
+    expect(spec).toContain('- SETTLEMENT_CHANGED');
+    expect(spec).toContain("'428': {$ref: '#/components/responses/PreconditionRequired'}");
+  });
+
+  it('documents persistent notifications and secret-free browser push summaries', () => {
+    expect(spec).toContain('/v1/notifications/{notificationId}/read:');
+    expect(spec).toContain('/v1/notifications/read-all:');
+    expect(spec).toContain('/v1/push-subscriptions/{subscriptionId}:');
+    expect(spec).toContain('/internal/notifications/drain:');
+    expect(spec).toContain('/internal/notifications/deliver:');
+    expect(spec).toContain('Safe summary. Push endpoint and encryption keys are never returned.');
+    expect(spec).toContain('cronBearer:');
+    expect(spec).toContain('webhookBearer:');
+    expect(spec).toContain('SupabaseNotificationInsertWebhook:');
+    expect(spec).toContain("type: {type: string, const: INSERT}");
+    expect(spec).toContain("table: {type: string, const: notifications}");
+    expect(spec).toMatch(/\/v1\/notifications:[\s\S]*?default: 50/);
+    expect(spec).toMatch(/\/v1\/push-subscriptions:[\s\S]*?'429': \{\$ref: '#\/components\/responses\/RateLimited'\}/);
+  });
 });

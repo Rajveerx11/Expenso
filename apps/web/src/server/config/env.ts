@@ -71,3 +71,35 @@ export function getRateLimitSecret(): string {
   if (secret.length < 32) throw new ConfigurationError('RATE_LIMIT_SECRET must be at least 32 characters.');
   return secret;
 }
+
+export function getServiceRoleConfig() {
+  return {
+    supabaseUrl: parseUrl('SUPABASE_URL', process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL),
+    serviceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY),
+  };
+}
+
+export function getWebPushConfig() {
+  const publicKey = required('VAPID_PUBLIC_KEY', process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  const privateKey = required('VAPID_PRIVATE_KEY', process.env.VAPID_PRIVATE_KEY);
+  const subject = required('VAPID_SUBJECT', process.env.VAPID_SUBJECT);
+  if (!/^[A-Za-z0-9_-]{87}$/.test(publicKey) || !/^[A-Za-z0-9_-]{43}$/.test(privateKey)) {
+    throw new ConfigurationError('Invalid VAPID key configuration.');
+  }
+  if (!/^mailto:[^\s@]+@[^\s@]+$/.test(subject) && !/^https:\/\/[^\s]+$/.test(subject)) {
+    throw new ConfigurationError('Invalid VAPID_SUBJECT.');
+  }
+  return { publicKey, privateKey, subject };
+}
+
+export function getCronSecret(): string {
+  const value = required('CRON_SECRET', process.env.CRON_SECRET);
+  if (value.length < 32) throw new ConfigurationError('CRON_SECRET must be at least 32 characters.');
+  return value;
+}
+
+export function getDatabaseWebhookSecret(): string {
+  const value = required('DATABASE_WEBHOOK_SECRET', process.env.DATABASE_WEBHOOK_SECRET);
+  if (value.length < 32) throw new ConfigurationError('DATABASE_WEBHOOK_SECRET must be at least 32 characters.');
+  return value;
+}
