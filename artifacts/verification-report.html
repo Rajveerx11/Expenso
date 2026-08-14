@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expenso — End-to-End Verification Report</title>
+  <style>
+    :root { color-scheme: light; --ink:#18251f; --muted:#617069; --line:#dce8e0; --paper:#f6faf7; --card:#fff; --green:#176b45; --mint:#dff5e8; --navy:#173c34; --amber:#996315; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:linear-gradient(145deg,#eef8f1 0,#fafcfb 45%,#edf4f0 100%); }
+    a { color:var(--green); font-weight:700; }
+    main { width:min(1160px,calc(100% - 32px)); margin:32px auto 72px; }
+    .hero { padding:42px; border-radius:28px; background:var(--navy); color:#fff; box-shadow:0 22px 60px rgba(23,60,52,.2); }
+    .eyebrow { margin:0 0 10px; font-size:12px; letter-spacing:.13em; text-transform:uppercase; color:#afe1c2; font-weight:800; }
+    h1 { margin:0; font-size:clamp(34px,6vw,64px); line-height:.98; letter-spacing:-.04em; }
+    .hero-copy { max-width:760px; margin:22px 0 0; color:#d8e7df; font-size:18px; }
+    .status { display:inline-flex; gap:9px; align-items:center; margin-top:24px; padding:9px 14px; border-radius:999px; color:#133d2d; background:#b9f1ce; font-weight:850; }
+    .status::before { content:""; width:9px; height:9px; border-radius:50%; background:#15844e; box-shadow:0 0 0 4px rgba(21,132,78,.14); }
+    .meta { display:flex; flex-wrap:wrap; gap:10px 26px; margin-top:26px; color:#bdd4c8; font-size:13px; }
+    section { margin-top:28px; }
+    .section-head { display:flex; align-items:end; justify-content:space-between; gap:20px; margin:0 4px 14px; }
+    h2 { margin:0; font-size:25px; letter-spacing:-.025em; }
+    .section-head p { margin:0; color:var(--muted); }
+    .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:16px; }
+    .card { grid-column:span 4; padding:22px; border:1px solid var(--line); border-radius:20px; background:rgba(255,255,255,.9); box-shadow:0 10px 30px rgba(38,77,60,.06); }
+    .metric { font-size:34px; font-weight:900; letter-spacing:-.04em; color:var(--green); }
+    .metric-label { color:var(--muted); font-weight:650; }
+    .wide { grid-column:span 12; }
+    .half { grid-column:span 6; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:13px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+    tr:last-child td { border-bottom:0; }
+    .pass { color:var(--green); font-weight:850; white-space:nowrap; }
+    .pass::before { content:"✓ "; }
+    .flow { margin:0; padding:0; list-style:none; counter-reset:flow; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .flow li { counter-increment:flow; padding:16px 16px 16px 54px; border:1px solid var(--line); border-radius:15px; position:relative; background:var(--paper); }
+    .flow li::before { content:counter(flow); position:absolute; left:16px; top:16px; width:25px; height:25px; display:grid; place-items:center; border-radius:50%; color:#fff; background:var(--green); font-size:12px; font-weight:850; }
+    .flow strong { display:block; }
+    .flow span { color:var(--muted); font-size:13px; }
+    .gallery { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+    figure { margin:0; overflow:hidden; border:1px solid var(--line); border-radius:18px; background:#fff; }
+    figure img { display:block; width:100%; height:220px; object-fit:cover; object-position:top; background:#e7efea; }
+    figure.mobile img { object-fit:contain; background:#15201b; }
+    figcaption { padding:12px 14px; font-size:13px; font-weight:750; }
+    .videos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .video-card { padding:16px; border:1px solid var(--line); border-radius:20px; background:#fff; }
+    .video-card video { width:100%; max-height:480px; border-radius:12px; background:#111; }
+    .video-card h3 { margin:10px 0 2px; }
+    .video-card p { margin:0; color:var(--muted); }
+    .note { padding:18px 20px; border-left:4px solid var(--amber); border-radius:10px; background:#fff7e7; color:#5e461e; }
+    code { padding:2px 6px; border-radius:6px; background:#eaf2ed; }
+    footer { margin-top:34px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media (max-width:800px) { main{width:min(100% - 20px,1160px);margin-top:10px}.hero{padding:28px 22px;border-radius:22px}.card,.half{grid-column:span 12}.flow,.gallery,.videos{grid-template-columns:1fr}.section-head{align-items:start;flex-direction:column}th,td{padding:10px 7px;font-size:12px} }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Issue #7 · Release evidence</p>
+      <h1>Expenso web app<br>verified end to end.</h1>
+      <p class="hero-copy">Frontend now uses production-shaped Node.js APIs and Supabase-backed data. Two real browser identities completed the full expense-sharing and settlement journey on an isolated local Supabase instance.</p>
+      <div class="status">Release candidate passed</div>
+      <div class="meta"><span>Generated: 14 Aug 2026 · IST</span><span>Browsers: Chromium + Firefox</span><span>Viewports: desktop + mobile + tablet</span><span>Backend: Next.js Route Handlers + Supabase Postgres/Auth/Storage</span></div>
+    </header>
+
+    <section aria-labelledby="proof-title">
+      <div class="section-head"><div><p class="eyebrow" style="color:var(--green)">Automated proof</p><h2 id="proof-title">All release gates passed</h2></div><p>Fresh database and production build.</p></div>
+      <div class="grid">
+        <article class="card"><div class="metric">177</div><div class="metric-label">Vitest unit, contract, route, and security tests</div></article>
+        <article class="card"><div class="metric">242</div><div class="metric-label">pgTAP database authorization and behavior checks</div></article>
+        <article class="card"><div class="metric">4 / 4</div><div class="metric-label">Concurrent transaction race harnesses</div></article>
+        <article class="card wide">
+          <table>
+            <thead><tr><th>Gate</th><th>Result</th><th>Evidence</th></tr></thead>
+            <tbody>
+              <tr><td>Two-user browser journey</td><td class="pass">Passed</td><td>Chromium — complete finance, group, settlement, privacy, keyboard, refresh, and back/forward flow</td></tr>
+              <tr><td>Cross-browser responsive smoke</td><td class="pass">Passed</td><td>Firefox, 10.4 s — authentication, dashboard, mobile navigation, inbox</td></tr>
+              <tr><td>Production compilation</td><td class="pass">Passed</td><td>Next.js 16.3 generated every page and API route</td></tr>
+              <tr><td>Type and code quality</td><td class="pass">Passed</td><td>TypeScript and ESLint: zero errors</td></tr>
+              <tr><td>Python migration contracts</td><td class="pass">Passed</td><td>18 checks passed; 2 retired Android-only checks skipped</td></tr>
+              <tr><td>Database schema lint</td><td class="pass">Passed</td><td>Public and private schemas: no errors</td></tr>
+              <tr><td>Dependency security</td><td class="pass">Passed</td><td><code>npm audit</code>: 0 vulnerabilities</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="journey-title">
+      <div class="section-head"><div><p class="eyebrow" style="color:var(--green)">Real data journey</p><h2 id="journey-title">What browser automation proved</h2></div></div>
+      <article class="card wide">
+        <ol class="flow">
+          <li><strong>Create Alice and Bob</strong><span>Signup, login, onboarding, session cookies, protected redirects.</span></li>
+          <li><strong>Build personal ledger</strong><span>Income and expense creation, analytics, editing, exact signed totals.</span></li>
+          <li><strong>Prove privacy</strong><span>Second user cannot open first user’s private personal transaction; database tests separately protect profile aggregates.</span></li>
+          <li><strong>Upload profile and group images</strong><span>Signed Storage ticket, PUT upload, authoritative completion.</span></li>
+          <li><strong>Create and manage group</strong><span>Exact-email membership, roles, editor denial, settings.</span></li>
+          <li><strong>Split shared expense</strong><span>Equal split creation, balances, member debt, history.</span></li>
+          <li><strong>Generate real UPI QR</strong><span>Validated amount, correlation reference, explicit “payment sent” acknowledgement.</span></li>
+          <li><strong>Settle with two identities</strong><span>Payer claims; receiver opens inbox deep link and confirms; balances clear.</span></li>
+          <li><strong>Verify durable notifications</strong><span>Read state, unread badge, deep links, service-worker registration.</span></li>
+          <li><strong>Verify logout safety</strong><span>Push cleanup, server logout, cache clear, protected-route redirect.</span></li>
+        </ol>
+      </article>
+    </section>
+
+    <section aria-labelledby="recordings-title">
+      <div class="section-head"><div><p class="eyebrow" style="color:var(--green)">Screen recordings</p><h2 id="recordings-title">Watch tested journeys</h2></div><p>Recorded by Playwright during successful runs.</p></div>
+      <div class="videos">
+        <article class="video-card"><video controls preload="metadata" src="evidence/alice-desktop-full-flow.mp4"></video><h3>Alice · desktop full flow</h3><p>Personal finance, group creation, shared expense, notification, confirmation. <a href="evidence/alice-desktop-full-flow.mp4">Open recording</a></p></article>
+        <article class="video-card"><video controls preload="metadata" src="evidence/bob-mobile-full-flow.mp4"></video><h3>Bob · mobile full flow</h3><p>Mobile navigation, payer settlement, waiting state, confirmed result. <a href="evidence/bob-mobile-full-flow.mp4">Open recording</a></p></article>
+        <article class="video-card"><video controls preload="metadata" src="evidence/firefox-smoke.mp4"></video><h3>Firefox smoke</h3><p>Cross-browser login, dashboard, navigation, inbox. <a href="evidence/firefox-smoke.mp4">Open recording</a></p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="screens-title">
+      <div class="section-head"><div><p class="eyebrow" style="color:var(--green)">Screenshots</p><h2 id="screens-title">Milestone evidence</h2></div></div>
+      <div class="gallery">
+        <figure><a href="evidence/01-alice-dashboard-desktop.png"><img src="evidence/01-alice-dashboard-desktop.png" alt="Alice desktop dashboard"></a><figcaption>01 · Live desktop dashboard</figcaption></figure>
+        <figure class="mobile"><a href="evidence/02-bob-dashboard-mobile.png"><img src="evidence/02-bob-dashboard-mobile.png" alt="Bob mobile dashboard"></a><figcaption>02 · Mobile dashboard</figcaption></figure>
+        <figure><a href="evidence/03-personal-ledger-live.png"><img src="evidence/03-personal-ledger-live.png" alt="Personal ledger with live transactions"></a><figcaption>03 · Personal ledger</figcaption></figure>
+        <figure><a href="evidence/04-group-created-with-image.png"><img src="evidence/04-group-created-with-image.png" alt="Group created with image"></a><figcaption>04 · Group and image upload</figcaption></figure>
+        <figure><a href="evidence/05-shared-expense-splits.png"><img src="evidence/05-shared-expense-splits.png" alt="Shared expense splits"></a><figcaption>05 · Shared expense splits</figcaption></figure>
+        <figure class="mobile"><a href="evidence/06-real-upi-qr-mobile.png"><img src="evidence/06-real-upi-qr-mobile.png" alt="Real UPI QR on mobile"></a><figcaption>06 · Real UPI QR</figcaption></figure>
+        <figure class="mobile"><a href="evidence/07-payer-waiting-mobile.png"><img src="evidence/07-payer-waiting-mobile.png" alt="Payer waiting state"></a><figcaption>07 · Pending settlement</figcaption></figure>
+        <figure><a href="evidence/08-receiver-inbox.png"><img src="evidence/08-receiver-inbox.png" alt="Receiver notification inbox"></a><figcaption>08 · Durable inbox</figcaption></figure>
+        <figure><a href="evidence/09-settlement-confirmed-desktop.png"><img src="evidence/09-settlement-confirmed-desktop.png" alt="Confirmed settlement"></a><figcaption>09 · Receiver confirmation</figcaption></figure>
+        <figure><a href="evidence/10-dashboard-tablet.png"><img src="evidence/10-dashboard-tablet.png" alt="Tablet dashboard"></a><figcaption>10 · Tablet layout</figcaption></figure>
+        <figure class="mobile"><a href="evidence/11-signout-protected-redirect-mobile.png"><img src="evidence/11-signout-protected-redirect-mobile.png" alt="Protected route redirects after logout"></a><figcaption>11 · Safe logout redirect</figcaption></figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="scope-title">
+      <div class="section-head"><div><p class="eyebrow" style="color:var(--green)">Environment boundary</p><h2 id="scope-title">Verified scope and remaining deployment step</h2></div></div>
+      <div class="grid">
+        <article class="card half"><h3>Verified</h3><p>Fresh isolated Supabase instance running repository’s complete migration chain; real local Auth, Postgres, RLS, Storage, browser cookies, Node.js APIs, and service worker. No runtime mock data.</p></article>
+        <article class="card half"><h3>Deployment-owned</h3><p>Hosted project <code>rspuqbcgjqezimwwpbzl</code> was not mutated because this environment has no owner access token. Apply reviewed migrations and required secrets through CI or Supabase Dashboard before production traffic.</p></article>
+        <article class="card wide"><div class="note"><strong>Push-provider boundary:</strong> subscription lifecycle, provider allowlist, queue leasing, retry/invalidation logic, service-worker display/click behavior, and logout cleanup are automated. A real external Web Push provider delivery was not sent from this local run because production VAPID credentials and a public HTTPS origin are deployment secrets.</div></article>
+      </div>
+    </section>
+
+    <footer>Expenso Issue #7 verification artifact · Open this file beside the <code>evidence</code> directory to play recordings and inspect full-size screenshots.</footer>
+  </main>
+</body>
+</html>

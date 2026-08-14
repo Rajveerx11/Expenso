@@ -1,28 +1,45 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit2, Bell, LogOut, ChevronRight, Wallet } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { Avatar } from '@/components/ui/Avatar';
-import { MoneyText } from '@/components/ui/MoneyText';
 import { DangerButton } from '@/components/ui/Buttons';
-import { MOCK_PROFILE } from '@/lib/mockData';
+import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation } from '@/components/ui/AsyncState';
+import { api, messageForError } from '@/lib/api/client';
+import { queryKeys } from '@/lib/api/queries';
 import { formatMoney } from '@/lib/utils';
+import { bestEffortDisableCurrentPush } from '@/features/push/cleanup';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const profile = MOCK_PROFILE;
+  const queryClient = useQueryClient();
+  const profileQuery = useQuery({ queryKey: queryKeys.profile, queryFn: api.profile.get });
+  const logout = useMutation({
+    mutationFn: async () => {
+      await bestEffortDisableCurrentPush();
+      return api.auth.logout();
+    },
+    onSuccess: () => {
+      queryClient.clear();
+      router.replace('/login');
+      router.refresh();
+    },
+  });
 
-  function handleSignOut() {
-    // TODO: Supabase sign out
-    router.push('/login');
-  }
+  const handleSignOut = () => logout.mutate();
 
   const menuItems = [
     { href: '/profile/edit', icon: Edit2, label: 'Edit Profile' },
     { href: '/notifications', icon: Bell, label: 'Notifications' },
   ];
+  const errorPresentation = queryErrorPresentation(profileQuery.error, profileQuery.data !== undefined);
+
+  if (profileQuery.isPending) return <><AppHeader title="Profile" /><PageLoading label="Loading profile" /></>;
+  if (errorPresentation === 'blocking') return <><AppHeader title="Profile" /><PageError message={messageForError(profileQuery.error)} retry={() => profileQuery.refetch()} /></>;
+  const profile = profileQuery.data!;
 
   return (
     <>
@@ -30,10 +47,17 @@ export default function ProfilePage() {
       <PageShell>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingTop: '16px', paddingBottom: '32px' }}>
 
+          {errorPresentation === 'background' && (
+            <BackgroundRefreshError
+              retry={() => void profileQuery.refetch()}
+              isRetrying={profileQuery.isFetching}
+            />
+          )}
+
           {/* Profile Card */}
           <div
             style={{
-              background: 'linear-gradient(135deg, #4F46E5, #6366F1)',
+              background: 'linear-gradient(135deg, var(--color-primary-deep), var(--color-primary-medium))',
               borderRadius: '24px', padding: '24px',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
               boxShadow: '0 8px 32px rgba(79,70,229,0.3)',
@@ -44,11 +68,11 @@ export default function ProfilePage() {
             <Avatar name={profile.fullName} imageUrl={profile.avatarUrl} size="xl" />
             <div style={{ textAlign: 'center' }}>
               <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{profile.fullName}</h1>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)' }}>{profile.email}</p>
+              <p style={{ fontSize: '13px', color: 'white' }}>{profile.email}</p>
               {profile.upiId && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
-                  <Wallet size={14} color="rgba(255,255,255,0.8)" />
-                  <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>{profile.upiId}</span>
+                  <Wallet size={14} color="white" />
+                  <span style={{ fontSize: '13px', color: 'white', fontWeight: 500 }}>{profile.upiId}</span>
                 </div>
               )}
             </div>
@@ -63,7 +87,7 @@ export default function ProfilePage() {
             <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
               <p style={{ fontSize: '11px', color: 'var(--color-medium)', fontWeight: 500, marginBottom: '6px' }}>Net Balance</p>
               <p style={{ fontSize: '18px', fontWeight: 800, color: parseFloat(profile.totalBalance) >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
-                {formatMoney(profile.totalBalance, true)}
+                {Number(profile.totalBalance) < 0 ? '-' : ''}{formatMoney(profile.totalBalance, true)}
               </p>
             </div>
           </div>
@@ -90,7 +114,8 @@ export default function ProfilePage() {
           </div>
 
           {/* Sign Out */}
-          <DangerButton fullWidth onClick={handleSignOut} icon={<LogOut size={18} />}>
+          {logout.isError && <p role="alert" style={{ color: 'var(--color-red)', fontSize: 13 }}>{messageForError(logout.error)}</p>}
+          <DangerButton fullWidth loading={logout.isPending} onClick={handleSignOut} icon={<LogOut size={18} />}>
             Sign Out
           </DangerButton>
         </div>

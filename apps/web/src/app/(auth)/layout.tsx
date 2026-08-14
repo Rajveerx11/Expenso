@@ -18,7 +18,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Content */}
-      <div style={{
+      <main style={{
         flex: 1, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: '24px 20px 48px',
@@ -26,7 +26,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <div style={{ width: '100%', maxWidth: '400px' }}>
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

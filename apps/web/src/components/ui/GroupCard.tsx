@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Users } from 'lucide-react';
-import { Avatar } from './Avatar';
 import { BalanceChip } from './BalanceChip';
 import type { GroupSummary } from '@/lib/types';
 
@@ -20,7 +20,7 @@ export function GroupCard({ group }: GroupCardProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {group.imageUrl
-            ? <img src={group.imageUrl} alt={group.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <Image src={group.imageUrl} alt={group.name} width={52} height={52} unoptimized style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={{ fontSize: '22px' }}>👥</span>
           }
         </div>
@@ -30,6 +30,11 @@ export function GroupCard({ group }: GroupCardProps) {
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-black)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {group.name}
           </div>
+          {group.description && (
+            <p style={{ fontSize: 12, color: 'var(--color-medium)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {group.description}
+            </p>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
             <Users size={12} color="var(--color-medium)" />
             <span style={{ fontSize: '12px', color: 'var(--color-medium)' }}>{group.memberCount} members</span>
@@ -37,7 +42,7 @@ export function GroupCard({ group }: GroupCardProps) {
         </div>
 
         {/* Balance */}
-        <BalanceChip balance={group.currentUserBalance} />
+        <BalanceChip balance={group.currentUserBalance} size="sm" />
       </div>
     </Link>
   );

@@ -98,6 +98,7 @@ The public RPC remains callable by pre-auth routes, but rejects callers without 
 | GET | `/api/v1/notifications` | Yes | Page the persistent owned inbox. |
 | POST | `/api/v1/notifications/{notificationId}/read` | Yes | Idempotently mark one owned notification read. |
 | POST | `/api/v1/notifications/read-all` | Yes | Mark every owned notification read. |
+| GET | `/api/v1/push-subscriptions/vapid-public-key` | Yes | Return the browser-safe public VAPID key. |
 | POST | `/api/v1/push-subscriptions` | Yes | Register or rotate the current browser subscription. |
 | DELETE | `/api/v1/push-subscriptions/{subscriptionId}` | Yes | Disable one owned browser subscription. |
 | GET | `/api/internal/notifications/drain` | Cron bearer | Lease and deliver a bounded retry batch. |

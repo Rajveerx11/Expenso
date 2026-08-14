@@ -18,6 +18,9 @@ export function SuccessOverlay({ show, message = 'Done!', onComplete }: SuccessO
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       style={{
         position: 'fixed', inset: 0, zIndex: 200, display: 'flex',
         alignItems: 'center', justifyContent: 'center',
