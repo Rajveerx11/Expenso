@@ -10,17 +10,22 @@ const INR_FORMATTER = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 2,
 });
 
-const INR_COMPACT = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  notation: 'compact',
-  maximumFractionDigits: 1,
-});
+function formatCompactInr(value: number): string {
+  const units = [
+    { threshold: 10_000_000, suffix: 'Cr' },
+    { threshold: 100_000, suffix: 'L' },
+    { threshold: 1_000, suffix: 'K' },
+  ] as const;
+  const unit = units.find(({ threshold }) => value >= threshold);
+  const scaled = unit ? value / unit.threshold : value;
+  const rounded = (Math.round(scaled * 10) / 10).toFixed(1).replace(/\.0$/, '');
+  return `₹${rounded}${unit?.suffix ?? ''}`;
+}
 
 export function formatMoney(amount: string | number, compact = false): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(num)) return '₹0.00';
-  return compact ? INR_COMPACT.format(Math.abs(num)) : INR_FORMATTER.format(Math.abs(num));
+  return compact ? formatCompactInr(Math.abs(num)) : INR_FORMATTER.format(Math.abs(num));
 }
 
 export function formatMoneyRaw(amount: string | number): number {
