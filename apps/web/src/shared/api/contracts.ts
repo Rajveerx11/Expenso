@@ -14,6 +14,7 @@ export const API_ERROR_CODES = [
   'SETTLEMENT_EXCEEDS_BALANCE',
   'SETTLEMENT_CHANGED',
   'LINKED_TRANSACTION_READ_ONLY',
+  'SETTLED_EXPENSE_IMMUTABLE',
   'IDEMPOTENCY_KEY_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',
   'RATE_LIMITED',
@@ -75,6 +76,19 @@ export const positiveMoneyInputSchema = z
     return `${BigInt(whole).toString()}.${fraction.padEnd(2, '0')}`;
   });
 
+const nonnegativeMoneyInputSchema = z
+  .string()
+  .regex(/^\d{1,10}(?:\.\d{1,2})?$/)
+  .refine((value) => {
+    const [whole, fraction = ''] = value.split('.');
+    const cents = BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2, '0'));
+    return cents <= BigInt('999999999999');
+  }, 'Amount must fit the supported range.')
+  .transform((value) => {
+    const [whole, fraction = ''] = value.split('.');
+    return `${BigInt(whole).toString()}.${fraction.padEnd(2, '0')}`;
+  });
+
 export const personalTransactionCreateSchema = z.strictObject({
   title: z.string().trim().min(1).max(120),
   amount: positiveMoneyInputSchema,
@@ -111,6 +125,65 @@ export const groupMemberAddSchema = z.strictObject({
 });
 
 export const groupListQuerySchema = z.strictObject({
+  cursor: z.string().min(1).max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
+const groupExpenseBase = {
+  paidBy: uuidSchema,
+  title: z.string().trim().min(1).max(120),
+  totalAmount: positiveMoneyInputSchema,
+  category: z.enum(PERSONAL_CATEGORIES),
+  note: z.string().trim().max(500).nullable().optional(),
+  expenseDate: dateSchema,
+};
+
+const percentageInputSchema = z
+  .string()
+  .regex(/^(?:100(?:\.0{1,4})?|\d{1,2}(?:\.\d{1,4})?)$/)
+  .refine((value) => Number(value) > 0, 'Percentage must be positive.')
+  .transform((value) => {
+    const [whole, fraction = ''] = value.split('.');
+    return `${BigInt(whole).toString()}.${fraction.padEnd(4, '0')}`;
+  });
+
+const equalSplitSchema = z.strictObject({
+  userId: uuidSchema,
+  // Browser preview accepted, then ignored by authoritative server allocation.
+  owedAmount: nonnegativeMoneyInputSchema.optional(),
+});
+
+const exactSplitSchema = z.strictObject({
+  userId: uuidSchema,
+  owedAmount: positiveMoneyInputSchema,
+});
+
+const percentageSplitSchema = z.strictObject({
+  userId: uuidSchema,
+  percentage: percentageInputSchema,
+  // Browser preview accepted, then ignored by authoritative server allocation.
+  owedAmount: nonnegativeMoneyInputSchema.optional(),
+});
+
+export const groupExpenseCreateSchema = z.discriminatedUnion('splitType', [
+  z.strictObject({
+    ...groupExpenseBase,
+    splitType: z.literal('equal'),
+    splits: z.array(equalSplitSchema).min(1).max(500),
+  }),
+  z.strictObject({
+    ...groupExpenseBase,
+    splitType: z.literal('exact'),
+    splits: z.array(exactSplitSchema).min(1).max(500),
+  }),
+  z.strictObject({
+    ...groupExpenseBase,
+    splitType: z.literal('percentage'),
+    splits: z.array(percentageSplitSchema).min(1).max(500),
+  }),
+]);
+
+export const groupExpenseListQuerySchema = z.strictObject({
   cursor: z.string().min(1).max(500).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });

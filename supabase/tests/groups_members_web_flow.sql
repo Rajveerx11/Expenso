@@ -131,11 +131,12 @@ select throws_ok(
 );
 
 select lives_ok(
-  $$select public.create_group_expense(
+  $$select * from public.create_group_expense_web(
       current_setting('test.web_group_id')::uuid,
       '15000000-0000-0000-0000-000000000001',
       'Debt guard', 10.00, 'Other', 'exact', null, '2026-08-14',
-      '[{"user_id":"15000000-0000-0000-0000-000000000002","owed_amount":10}]'::jsonb
+      '[{"user_id":"15000000-0000-0000-0000-000000000002","value":"10.00"}]'::jsonb,
+      'group-debt-guard-0001'
   )$$,
   'fixture shared expense is created'
 );

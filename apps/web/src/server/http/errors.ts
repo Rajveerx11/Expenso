@@ -17,6 +17,7 @@ const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
   SETTLEMENT_EXCEEDS_BALANCE: 'The settlement exceeds the latest balance.',
   SETTLEMENT_CHANGED: 'The balance changed before confirmation.',
   LINKED_TRANSACTION_READ_ONLY: 'Group-linked transactions are read-only here.',
+  SETTLED_EXPENSE_IMMUTABLE: 'An expense with settled shares cannot be deleted.',
   IDEMPOTENCY_KEY_REQUIRED: 'An idempotency key is required.',
   IDEMPOTENCY_KEY_REUSED: 'This idempotency key was used for a different request.',
   RATE_LIMITED: 'Too many requests. Try again later.',
@@ -98,7 +99,7 @@ export function mapDataError(error: SupabaseLikeError | null, fallbackCode: ApiE
   if (error.code === 'PGRST116') return new AppError({ code: 'NOT_FOUND', status: 404, cause: error });
   if (error.code === '42501') return new AppError({ code: 'FORBIDDEN', status: 403, cause: error });
   if (error.code === '23505') return new AppError({ code: 'CONFLICT', status: 409, cause: error });
-  if (error.code === '23514' || error.code === '22P02') {
+  if (error.code === '23514' || error.code === '22P02' || error.code === '22023') {
     return new AppError({ code: 'VALIDATION_ERROR', status: 422, cause: error });
   }
   return new AppError({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   avatarTicketSchema,
+  groupExpenseCreateSchema,
   loginSchema,
   moneySchema,
   personalTransactionCreateSchema,
@@ -55,5 +56,51 @@ describe('shared API contracts', () => {
     }).success).toBe(false);
     expect(personalTransactionPatchSchema.safeParse({}).success).toBe(false);
     expect(personalTransactionPatchSchema.safeParse({ amount: '1.001' }).success).toBe(false);
+  });
+
+  it('accepts only the fields required by each shared-expense split mode', () => {
+    const base = {
+      paidBy: '00000000-0000-4000-8000-000000000001',
+      title: 'Dinner',
+      totalAmount: '100',
+      category: 'Food' as const,
+      expenseDate: '2026-08-14',
+    };
+    expect(groupExpenseCreateSchema.parse({
+      ...base,
+      splitType: 'equal',
+      splits: [{ userId: base.paidBy, owedAmount: '99.99' }],
+    })).toMatchObject({ totalAmount: '100.00', splits: [{ owedAmount: '99.99' }] });
+    expect(groupExpenseCreateSchema.parse({
+      ...base,
+      splitType: 'percentage',
+      splits: [{ userId: base.paidBy, percentage: '100', owedAmount: '0.00' }],
+    })).toMatchObject({ splits: [{ percentage: '100.0000', owedAmount: '0.00' }] });
+    expect(groupExpenseCreateSchema.parse({
+      ...base,
+      splitType: 'equal',
+      splits: [{ userId: base.paidBy, owedAmount: '0' }],
+    })).toMatchObject({ splits: [{ owedAmount: '0.00' }] });
+    expect(groupExpenseCreateSchema.safeParse({
+      ...base,
+      splitType: 'exact',
+      splits: [{ userId: base.paidBy, percentage: '100' }],
+    }).success).toBe(false);
+    expect(groupExpenseCreateSchema.safeParse({
+      ...base,
+      splitType: 'shares',
+      splits: [{ userId: base.paidBy }],
+    }).success).toBe(false);
+    expect(groupExpenseCreateSchema.safeParse({
+      ...base,
+      totalAmount: '0.00',
+      splitType: 'equal',
+      splits: [{ userId: base.paidBy }],
+    }).success).toBe(false);
+    expect(groupExpenseCreateSchema.safeParse({
+      ...base,
+      splitType: 'percentage',
+      splits: [{ userId: base.paidBy, percentage: '0.0000' }],
+    }).success).toBe(false);
   });
 });
