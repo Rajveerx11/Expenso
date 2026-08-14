@@ -461,7 +461,9 @@ test('complete two-user finance, group, settlement, inbox, upload, authorization
 
     await alicePage.goto(groupUrl);
     await alicePage.getByRole('button', { name: 'Balances' }).click();
-    await expect(alicePage.getByText(/You are owed/)).toBeVisible();
+    await expect(
+      alicePage.getByLabel('Your group balances').getByText(/^You are owed ₹/),
+    ).toBeVisible();
     await expectNoSeriousAxeViolations(alicePage);
     await alicePage.getByRole('button', { name: 'Settlements' }).click();
     await expect(alicePage.getByText('Your settlement history')).toBeVisible();
