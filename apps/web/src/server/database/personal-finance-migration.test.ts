@@ -6,6 +6,10 @@ const migration = readFileSync(
   resolve(process.cwd(), '../../supabase/migrations/20260814020000_personal_finance_api.sql'),
   'utf8',
 ).toLowerCase();
+const hardeningMigration = readFileSync(
+  resolve(process.cwd(), '../../supabase/migrations/20260814024541_personal_idempotency_hardening.sql'),
+  'utf8',
+).toLowerCase();
 
 describe('personal finance database contract', () => {
   it('keeps mutations atomic with aggregate recalculation and linked-row protection', () => {
@@ -25,6 +29,14 @@ describe('personal finance database contract', () => {
     expect(migration).toContain('idempotency_key_reused');
     expect(migration).toContain('pg_advisory_xact_lock');
     expect(migration).toContain('revoke all on private.api_idempotency_keys from public, anon, authenticated');
+    expect(hardeningMigration).toContain("computed_request_hash := encode(extensions.digest(");
+    expect(hardeningMigration).toContain('constraint personal_expenses_amount_finite');
+    expect(hardeningMigration).toContain(
+      'revoke all on function public.create_personal_expense(text, numeric, text, text, text, date, text, text)',
+    );
+    expect(hardeningMigration).toContain(
+      'grant execute on function public.create_personal_expense(text, numeric, text, text, text, date, text)',
+    );
   });
 
   it('uses session ownership and deterministic keyset ordering', () => {

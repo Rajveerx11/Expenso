@@ -25,7 +25,7 @@ wait_for_advisory_lock() {
 
 cleanup() {
   psql "$database_url" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
-drop function if exists public.issue3_concurrent_personal_create(text, numeric, text, text, numeric);
+drop function if exists public.issue3_concurrent_personal_create(text, numeric, text, numeric);
 drop function if exists public.issue3_concurrent_group_create(uuid, text, jsonb, numeric);
 drop function if exists public.issue4_remove_member_hold(uuid, uuid, numeric);
 drop function if exists public.issue4_add_member(uuid, text, text);
@@ -84,7 +84,6 @@ create or replace function public.issue3_concurrent_personal_create(
   title_param text,
   amount_param numeric,
   idempotency_key_param text,
-  request_hash_param text,
   hold_seconds_param numeric
 )
 returns text language plpgsql security definer set search_path = '' as $$
@@ -92,7 +91,7 @@ begin
   perform set_config('request.jwt.claim.sub', '14000000-0000-0000-0000-000000000099', true);
   perform * from public.create_personal_expense(
     title_param, amount_param, 'Salary', 'income', null, '2026-08-14',
-    idempotency_key_param, request_hash_param
+    idempotency_key_param
   );
   perform pg_sleep(hold_seconds_param);
   return 'created';
@@ -174,12 +173,12 @@ $$;
 SQL
 
 PGAPPNAME=issue3_personal_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
-  "select public.issue3_concurrent_personal_create('Concurrent income A',100.00,'concurrent-create-key-a',repeat('d',64),1.5)" >/dev/null &
+  "select public.issue3_concurrent_personal_create('Concurrent income A',100.00,'concurrent-create-key-a',1.5)" >/dev/null &
 personal_a=$!
 wait_for_advisory_lock issue3_personal_a
 personal_start=$(now_millis)
 PGAPPNAME=issue3_personal_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
-  "select public.issue3_concurrent_personal_create('Concurrent income B',200.00,'concurrent-create-key-b',repeat('e',64),0)" >/dev/null &
+  "select public.issue3_concurrent_personal_create('Concurrent income B',200.00,'concurrent-create-key-b',0)" >/dev/null &
 personal_b=$!
 wait "$personal_b"
 personal_elapsed=$(($(now_millis) - personal_start))
