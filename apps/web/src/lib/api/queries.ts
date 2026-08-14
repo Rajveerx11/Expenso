@@ -1,0 +1,16 @@
+export const queryKeys = {
+  profile: ['profile'] as const,
+  dashboard: (month: string) => ['dashboard', month] as const,
+  personal: (month: string, type: string) => ['personal-expenses', month, type] as const,
+  personalDetail: (expenseId: string) => ['personal-expense', expenseId] as const,
+  analytics: (month: string) => ['personal-analytics', month] as const,
+  groups: ['groups'] as const,
+  group: (groupId: string) => ['group', groupId] as const,
+  members: (groupId: string) => ['group-members', groupId] as const,
+  groupExpenses: (groupId: string) => ['group-expenses', groupId] as const,
+  groupExpense: (groupId: string, expenseId: string) => ['group-expense', groupId, expenseId] as const,
+  balances: (groupId: string) => ['group-balances', groupId] as const,
+  settlements: (groupId: string) => ['group-settlements', groupId] as const,
+  settlement: (groupId: string, settlementId: string) => ['group-settlement', groupId, settlementId] as const,
+  notifications: ['notifications'] as const,
+};

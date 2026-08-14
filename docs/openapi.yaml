@@ -1,0 +1,1475 @@
+openapi: 3.1.0
+info:
+  title: Expenso same-origin API
+  version: 1.0.0
+  description: Browser API. Supabase SSR session cookies are opaque and managed by the application.
+servers:
+  - url: /api
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Process is alive.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+  /readyz:
+    get:
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: Required dependencies are available.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/csrf:
+    get:
+      operationId: getCsrfToken
+      security: []
+      responses:
+        '200':
+          description: Current double-submit token. The response also sets its matching cookie.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CsrfResponse'}
+  /v1/auth/signup:
+    post:
+      operationId: signUp
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SignUpRequest'}
+      responses:
+        '201':
+          description: Registration accepted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SignUpResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/login:
+    post:
+      operationId: login
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/google:
+    post:
+      operationId: beginGoogleOAuth
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                next: {type: string, maxLength: 500}
+      responses:
+        '200':
+          description: Allowlisted provider authorization URL.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GoogleOAuthResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false}
+      responses:
+        '200':
+          description: Local session ended.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LogoutResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/me:
+    get:
+      operationId: getCurrentProfile
+      security:
+        - cookieSession: []
+      responses:
+        '200':
+          description: Current profile.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProfileResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+    patch:
+      operationId: updateCurrentProfile
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProfilePatch'}
+      responses:
+        '200':
+          description: Updated profile.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProfileResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/me/avatar/upload-ticket:
+    post:
+      operationId: createAvatarUploadTicket
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AvatarTicketRequest'}
+      responses:
+        '201':
+          description: Scoped direct-upload URL and token.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AvatarTicketResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/me/avatar/complete:
+    post:
+      operationId: completeAvatarUpload
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AvatarCompleteRequest'}
+      responses:
+        '200':
+          description: Verified avatar attached to the profile.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProfileResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/dashboard:
+    get:
+      operationId: getDashboard
+      security:
+        - cookieSession: []
+      parameters:
+        - {$ref: '#/components/parameters/Month'}
+      responses:
+        '200':
+          description: Monthly home aggregation.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/expenses:
+    get:
+      operationId: listPersonalTransactions
+      security:
+        - cookieSession: []
+      parameters:
+        - {$ref: '#/components/parameters/Month'}
+        - name: type
+          in: query
+          schema: {type: string, enum: [all, income, expense], default: all}
+        - name: cursor
+          in: query
+          schema: {type: string, maxLength: 500}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 30}
+      responses:
+        '200':
+          description: Deterministically paged monthly transactions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionListResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    post:
+      operationId: createPersonalTransaction
+      security:
+        - cookieSession: []
+          csrfToken: []
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PersonalTransactionCreate'}
+      responses:
+        '201':
+          description: Transaction created or same request replayed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionCreateResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /v1/expenses/analytics:
+    get:
+      operationId: getPersonalTransactionAnalytics
+      security:
+        - cookieSession: []
+      parameters:
+        - {$ref: '#/components/parameters/Month'}
+      responses:
+        '200':
+          description: Monthly, lifetime, and category totals.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalAnalyticsResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /v1/expenses/{expenseId}:
+    parameters:
+      - {$ref: '#/components/parameters/ExpenseId'}
+    get:
+      operationId: getPersonalTransaction
+      security:
+        - cookieSession: []
+      responses:
+        '200':
+          description: Authorized transaction.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    patch:
+      operationId: updatePersonalTransaction
+      security:
+        - cookieSession: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PersonalTransactionPatch'}
+      responses:
+        '200':
+          description: Updated manual transaction.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    delete:
+      operationId: deletePersonalTransaction
+      security:
+        - cookieSession: []
+          csrfToken: []
+      responses:
+        '200':
+          description: Manual transaction deleted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PersonalTransactionDeleteResponse'}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/groups:
+    get:
+      operationId: listGroups
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+      responses:
+        '200': {description: Paged current-user groups, content: {application/json: {schema: {$ref: '#/components/schemas/GroupListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    post:
+      operationId: createGroup
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupCreate'}}}
+      responses:
+        '201': {description: Group and creator-admin membership created atomically, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: getGroup
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Member-authorized group summary, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateGroup
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupPatch'}}}
+      responses:
+        '200': {description: Admin-updated group, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    delete:
+      operationId: deleteGroup
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Empty history-free group deleted, content: {application/json: {schema: {$ref: '#/components/schemas/GroupDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/groups/{groupId}/members:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupMembers
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Narrow group member directory, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: addGroupMember
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberAdd'}}}
+      responses:
+        '201': {description: Exact registered email added by admin, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/expenses:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupExpenses
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+      responses:
+        '200': {description: Paged member-authorized shared expenses, content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    post:
+      operationId: createGroupExpense
+      security: [{cookieSession: [], csrfToken: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseCreate'}}}
+      responses:
+        '201': {description: "Server-allocated atomic expense, mirrors, and replay state", content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseCreateResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/expenses/{expenseId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/ExpenseId'}]
+    get:
+      operationId: getGroupExpense
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Member-authorized expense and original splits, content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseDetailResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    delete:
+      operationId: deleteGroupExpense
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Unsettled payer/admin expense reversed atomically, content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/balances:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupBalances
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Caller-relative pairwise balances, content: {application/json: {schema: {$ref: '#/components/schemas/GroupBalanceListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupSettlements
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+      responses:
+        '200': {description: Involved group settlements in newest-first keyset order, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    post:
+      operationId: createGroupSettlement
+      security: [{cookieSession: [], csrfToken: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementCreate'}}}}
+      responses:
+        '201': {description: Pending settlement claim; payment remains unconfirmed until receiver action, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementCreateResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements/{settlementId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/SettlementId'}]
+    get:
+      operationId: getGroupSettlement
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Settlement detail visible only to involved group members, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements/{settlementId}/confirm:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/SettlementId'}]
+    post:
+      operationId: confirmGroupSettlement
+      description: Receiver-only. Empty body. Repeating a completed confirmation returns the terminal state.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Confirmed settlement after authoritative balance recheck and oldest-split allocation, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/settlements/{settlementId}/reject:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/SettlementId'}]
+    post:
+      operationId: rejectGroupSettlement
+      description: Receiver-only. Empty body. Repeating a completed rejection returns the terminal state.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Rejected settlement; balances remain unchanged, content: {application/json: {schema: {$ref: '#/components/schemas/SettlementResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Owned inbox in newest-first keyset order, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/notifications/{notificationId}/read:
+    parameters: [{$ref: '#/components/parameters/NotificationId'}]
+    post:
+      operationId: markNotificationRead
+      description: Empty body. Idempotently marks one owned notification read.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Notification marked read, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationReadResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      description: Empty body. Idempotently marks every owned notification read.
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Owned notifications marked read, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationsReadAllResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/push-subscriptions/vapid-public-key:
+    get:
+      operationId: getWebPushVapidPublicKey
+      description: Returns the authenticated browser-safe public VAPID key. The private VAPID key is never exposed.
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Browser-safe public VAPID key, content: {application/json: {schema: {$ref: '#/components/schemas/VapidPublicKeyResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/push-subscriptions:
+    post:
+      operationId: upsertWebPushSubscription
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushSubscriptionRequest'}}}}
+      responses:
+        '201': {description: Owned browser subscription registered without returning endpoint or encryption keys, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushSubscriptionResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/push-subscriptions/{subscriptionId}:
+    parameters: [{$ref: '#/components/parameters/SubscriptionId'}]
+    delete:
+      operationId: disableWebPushSubscription
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Owned subscription disabled, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushSubscriptionDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/notifications/drain:
+    get:
+      operationId: drainWebPushDeliveries
+      security: [{cronBearer: []}]
+      responses:
+        '200': {description: Claimed web-push deliveries processed, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushDrainResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/notifications/deliver:
+    post:
+      operationId: deliverNotificationWebhook
+      security: [{webhookBearer: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationWebhookRequest'}}}}
+      responses:
+        '200': {description: Authoritative pending deliveries processed, content: {application/json: {schema: {$ref: '#/components/schemas/WebPushDrainResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/members/{userId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/UserId'}]
+    delete:
+      operationId: removeGroupMember
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Debt-free member removed by admin, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/groups/{groupId}/image/upload-ticket:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    post:
+      operationId: createGroupImageUploadTicket
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AvatarTicketRequest'}}}}
+      responses:
+        '201': {description: Admin-scoped direct upload ticket, content: {application/json: {schema: {$ref: '#/components/schemas/GroupImageTicketResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/image/complete:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    post:
+      operationId: completeGroupImageUpload
+      security: [{cookieSession: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AvatarCompleteRequest'}}}}
+      responses:
+        '200': {description: Verified object attached by admin, content: {application/json: {schema: {$ref: '#/components/schemas/GroupResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+components:
+  parameters:
+    Month:
+      name: month
+      in: query
+      required: true
+      schema: {type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
+    ExpenseId:
+      name: expenseId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  securitySchemes:
+    cookieSession:
+      type: apiKey
+      in: header
+      name: Cookie
+      description: Opaque, project-prefixed, possibly chunked Supabase SSR cookies managed by the browser. Client code must not construct this header.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: x-csrf-token
+      description: Double-submit token returned by GET /v1/auth/csrf. Required with exact same-origin requests for every mutation.
+    cronBearer:
+      type: http
+      scheme: bearer
+      description: Server-managed CRON_SECRET. Never exposed to browser clients.
+    webhookBearer:
+      type: http
+      scheme: bearer
+      description: Server-managed database webhook secret. Never exposed to browser clients.
+  schemas:
+    SignUpRequest:
+      type: object
+      additionalProperties: false
+      required: [fullName, email, password]
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 100}
+        email: {type: string, format: email, maxLength: 320}
+        password: {type: string, minLength: 8, maxLength: 128}
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: {type: string, format: email, maxLength: 320}
+        password: {type: string, minLength: 1, maxLength: 128}
+    ProfilePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 100}
+        upiId:
+          anyOf:
+            - {type: string, minLength: 3, maxLength: 256}
+            - {type: 'null'}
+    AvatarTicketRequest:
+      type: object
+      additionalProperties: false
+      required: [contentType, sizeBytes]
+      properties:
+        contentType: {type: string, enum: [image/jpeg, image/png, image/webp]}
+        sizeBytes: {type: integer, minimum: 1, maximum: 5242880}
+    AvatarCompleteRequest:
+      type: object
+      additionalProperties: false
+      required: [path]
+      properties:
+        path: {type: string, minLength: 1, maxLength: 512}
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [id, email, fullName, avatarUrl, upiId, totalIncome, totalBalance, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        fullName: {type: string}
+        avatarUrl: {type: [string, 'null']}
+        upiId: {type: [string, 'null']}
+        totalIncome: {type: string, pattern: '^\d{1,10}\.\d{2}$'}
+        totalBalance: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    StatusResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [ok, ready]}
+    CsrfResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [csrfToken]
+              properties:
+                csrfToken: {type: string}
+    SignUpResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [userId, emailConfirmationRequired]
+              properties:
+                userId: {type: string, format: uuid}
+                emailConfirmationRequired: {type: boolean}
+    LoginResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [userId]
+              properties:
+                userId: {type: string, format: uuid}
+    GoogleOAuthResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: {type: string, format: uri}
+    LogoutResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [signedOut]
+              properties:
+                signedOut: {type: boolean, const: true}
+    ProfileResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {$ref: '#/components/schemas/Profile'}
+    PersonalTransactionCreate:
+      type: object
+      additionalProperties: false
+      required: [title, amount, category, type, expenseDate]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 120}
+        amount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        type: {type: string, enum: [income, expense]}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+    PersonalTransactionPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: {type: string, minLength: 1, maxLength: 120}
+        amount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        type: {type: string, enum: [income, expense]}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+    PersonalTransaction:
+      type: object
+      additionalProperties: false
+      required: [id, title, amount, category, type, note, sourceGroupExpenseId, expenseDate, createdAt, updatedAt, editable]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        amount: {$ref: '#/components/schemas/Money'}
+        category: {type: string}
+        type: {type: string, enum: [income, expense]}
+        note: {type: [string, 'null']}
+        sourceGroupExpenseId: {type: [string, 'null'], format: uuid}
+        editable: {type: boolean}
+        expenseDate: {type: string, format: date}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    PersonalTransactionResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {$ref: '#/components/schemas/PersonalTransaction'}
+    PersonalTransactionListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: array
+              items: {$ref: '#/components/schemas/PersonalTransaction'}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    PersonalTransactionCreateResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [transaction, replayed]
+              properties:
+                transaction: {$ref: '#/components/schemas/PersonalTransaction'}
+                replayed: {type: boolean}
+    PersonalTransactionDeleteResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [deleted, expenseId]
+              properties:
+                deleted: {type: boolean, const: true}
+                expenseId: {type: string, format: uuid}
+    PersonalAnalyticsResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [month, monthlyIncome, monthlyExpenses, monthlyNet, lifetimeIncome, lifetimeExpenses, lifetimeNet, categoryBreakdown]
+              properties:
+                month: {type: string}
+                monthlyIncome: {$ref: '#/components/schemas/Money'}
+                monthlyExpenses: {$ref: '#/components/schemas/Money'}
+                monthlyNet: {$ref: '#/components/schemas/SignedMoney'}
+                lifetimeIncome: {$ref: '#/components/schemas/Money'}
+                lifetimeExpenses: {$ref: '#/components/schemas/Money'}
+                lifetimeNet: {$ref: '#/components/schemas/SignedMoney'}
+                categoryBreakdown:
+                  type: array
+                  items:
+                    type: object
+                    required: [category, amount, percentage]
+                    properties:
+                      category: {type: string}
+                      amount: {$ref: '#/components/schemas/Money'}
+                      percentage: {type: number, minimum: 0, maximum: 100}
+    DashboardResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [profile, month, monthlyIncome, monthlyExpenses, monthlyNet, totalYouOwe, totalOwedToYou, pendingConfirmationCount, unreadNotificationCount, recentTransactions]
+              properties:
+                profile: {$ref: '#/components/schemas/Profile'}
+                month: {type: string}
+                monthlyIncome: {$ref: '#/components/schemas/Money'}
+                monthlyExpenses: {$ref: '#/components/schemas/Money'}
+                monthlyNet: {$ref: '#/components/schemas/SignedMoney'}
+                totalYouOwe: {$ref: '#/components/schemas/Money'}
+                totalOwedToYou: {$ref: '#/components/schemas/Money'}
+                pendingConfirmationCount: {type: integer, minimum: 0}
+                unreadNotificationCount: {type: integer, minimum: 0}
+                recentTransactions:
+                  type: array
+                  maxItems: 5
+                  items: {$ref: '#/components/schemas/PersonalTransaction'}
+    Money:
+      type: string
+      pattern: '^\d{1,10}\.\d{2}$'
+    SignedMoney:
+      type: string
+      pattern: '^-?\d{1,12}\.\d{2}$'
+    PositiveMoneyInput:
+      type: string
+      pattern: '^(?=.*[1-9])\d{1,10}(?:\.\d{1,2})?$'
+    NonnegativeMoneyInput:
+      type: string
+      pattern: '^\d{1,10}(?:\.\d{1,2})?$'
+    PersonalCategory:
+      type: string
+      enum: [Food, Transport, Shopping, Entertainment, Bills, Health, Education, Travel, Groceries, Rent, Salary, Freelance, Other]
+    GroupExpenseCreate:
+      oneOf:
+        - {$ref: '#/components/schemas/GroupExpenseEqualCreate'}
+        - {$ref: '#/components/schemas/GroupExpenseExactCreate'}
+        - {$ref: '#/components/schemas/GroupExpensePercentageCreate'}
+      discriminator: {propertyName: splitType}
+    GroupExpenseEqualCreate:
+      type: object
+      additionalProperties: false
+      required: [paidBy, title, totalAmount, category, splitType, expenseDate, splits]
+      properties:
+        paidBy: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        totalAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        splitType: {type: string, const: equal}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId]
+            properties:
+              userId: {type: string, format: uuid}
+              owedAmount: {$ref: '#/components/schemas/NonnegativeMoneyInput', description: Optional browser preview ignored by server allocation.}
+    GroupExpenseExactCreate:
+      type: object
+      additionalProperties: false
+      required: [paidBy, title, totalAmount, category, splitType, expenseDate, splits]
+      properties:
+        paidBy: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        totalAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        splitType: {type: string, const: exact}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId, owedAmount]
+            properties:
+              userId: {type: string, format: uuid}
+              owedAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+    GroupExpensePercentageCreate:
+      type: object
+      additionalProperties: false
+      required: [paidBy, title, totalAmount, category, splitType, expenseDate, splits]
+      properties:
+        paidBy: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        totalAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        splitType: {type: string, const: percentage}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId, percentage]
+            properties:
+              userId: {type: string, format: uuid}
+              percentage: {type: string, pattern: '^(?=.*[1-9])(?:100(?:\.0{1,4})?|\d{1,2}(?:\.\d{1,4})?)$'}
+              owedAmount: {$ref: '#/components/schemas/NonnegativeMoneyInput', description: Optional browser preview ignored by server allocation.}
+    GroupExpense:
+      type: object
+      additionalProperties: false
+      required: [id, groupId, paidBy, paidByName, title, totalAmount, category, splitType, note, expenseDate, createdAt, updatedAt, canDelete]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        paidBy: {type: string, format: uuid}
+        paidByName: {type: string}
+        title: {type: string}
+        totalAmount: {$ref: '#/components/schemas/Money'}
+        category: {type: string}
+        splitType: {type: string, enum: [equal, exact, percentage, shares], description: shares is read-only legacy compatibility.}
+        note: {type: [string, 'null']}
+        expenseDate: {type: string, format: date}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        canDelete: {type: boolean}
+    ExpenseSplit:
+      type: object
+      additionalProperties: false
+      required: [id, expenseId, userId, userName, owedAmount, settledAmount, isSettled, settledAt]
+      properties:
+        id: {type: string, format: uuid}
+        expenseId: {type: string, format: uuid}
+        userId: {type: string, format: uuid}
+        userName: {type: string}
+        owedAmount: {$ref: '#/components/schemas/Money'}
+        settledAmount: {$ref: '#/components/schemas/Money'}
+        isSettled: {type: boolean}
+        settledAt: {type: [string, 'null'], format: date-time}
+    GroupExpenseDetail:
+      type: object
+      additionalProperties: false
+      required: [expense, splits]
+      properties:
+        expense: {$ref: '#/components/schemas/GroupExpense'}
+        splits: {type: array, items: {$ref: '#/components/schemas/ExpenseSplit'}}
+    GroupExpenseListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/GroupExpense'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    GroupExpenseDetailResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GroupExpenseDetail'}}}]
+    GroupExpenseCreateResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [expense, splits, replayed]
+              properties:
+                expense: {$ref: '#/components/schemas/GroupExpense'}
+                splits: {type: array, items: {$ref: '#/components/schemas/ExpenseSplit'}}
+                replayed: {type: boolean}
+    GroupExpenseDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, required: [deleted, expenseId], properties: {deleted: {type: boolean, const: true}, expenseId: {type: string, format: uuid}}}}}]
+    GroupBalance:
+      type: object
+      additionalProperties: false
+      required: [userId, userName, userAvatarUrl, userUpiId, balance, direction]
+      properties:
+        userId: {type: string, format: uuid}
+        userName: {type: string}
+        userAvatarUrl: {type: [string, 'null']}
+        userUpiId: {type: [string, 'null']}
+        balance: {$ref: '#/components/schemas/SignedMoney'}
+        direction: {type: string, enum: [owes_you, you_owe, settled]}
+    GroupBalanceListResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GroupBalance'}}}}]
+    SettlementCreate:
+      type: object
+      additionalProperties: false
+      required: [receiverId, amount]
+      properties:
+        receiverId: {type: string, format: uuid}
+        amount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        transactionRef: {type: [string, 'null'], minLength: 1, maxLength: 200}
+    Settlement:
+      type: object
+      additionalProperties: false
+      required: [id, groupId, payerId, payerName, receiverId, receiverName, amount, status, transactionRef, createdAt, confirmedAt, canRespond]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        payerId: {type: string, format: uuid}
+        payerName: {type: string}
+        receiverId: {type: string, format: uuid}
+        receiverName: {type: string}
+        amount: {$ref: '#/components/schemas/Money'}
+        status: {type: string, enum: [pending_confirmation, confirmed, rejected]}
+        transactionRef: {type: [string, 'null'], maxLength: 200}
+        createdAt: {type: string, format: date-time}
+        confirmedAt: {type: [string, 'null'], format: date-time}
+        canRespond: {type: boolean}
+    SettlementResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/Settlement'}}}]
+    SettlementListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/Settlement'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    SettlementCreateResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [settlement, replayed]
+              properties:
+                settlement: {$ref: '#/components/schemas/Settlement'}
+                replayed: {type: boolean}
+    AppNotification:
+      type: object
+      additionalProperties: false
+      required: [id, type, title, message, groupId, relatedId, href, isRead, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [expense_added, member_added, settlement_request, settlement_confirmed, settlement_rejected]}
+        title: {type: string}
+        message: {type: string}
+        groupId: {type: [string, 'null'], format: uuid}
+        relatedId: {type: [string, 'null'], format: uuid}
+        href:
+          type: string
+          pattern: '^/(?:notifications|groups/[0-9A-Fa-f-]{36}(?:/settlements/[0-9A-Fa-f-]{36})?)$'
+        isRead: {type: boolean}
+        createdAt: {type: string, format: date-time}
+    NotificationListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/AppNotification'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    NotificationReadResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [read, notificationId], properties: {read: {type: boolean, const: true}, notificationId: {type: string, format: uuid}}}}}]
+    NotificationsReadAllResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [read, updatedCount], properties: {read: {type: boolean, const: true}, updatedCount: {type: integer, minimum: 0}}}}}]
+    WebPushSubscriptionRequest:
+      type: object
+      additionalProperties: false
+      required: [endpoint, expirationTime, keys]
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: HTTPS endpoint from a supported browser push service. Private/arbitrary hosts are rejected.
+        expirationTime: {type: [integer, 'null'], minimum: 0, maximum: 8640000000000000, description: Future epoch milliseconds supplied by PushSubscription.}
+        keys:
+          type: object
+          additionalProperties: false
+          required: [p256dh, auth]
+          properties:
+            p256dh: {type: string, minLength: 43, maxLength: 256, pattern: '^[A-Za-z0-9_-]+$'}
+            auth: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$'}
+        userAgent: {type: [string, 'null'], minLength: 1, maxLength: 300}
+    WebPushSubscriptionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, expirationTime, userAgent, createdAt, lastSuccessAt]
+      description: Safe summary. Push endpoint and encryption keys are never returned.
+      properties:
+        id: {type: string, format: uuid}
+        expirationTime: {type: [integer, 'null'], minimum: 0}
+        userAgent: {type: [string, 'null'], maxLength: 300}
+        createdAt: {type: string, format: date-time}
+        lastSuccessAt: {type: [string, 'null'], format: date-time}
+    WebPushSubscriptionResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/WebPushSubscriptionSummary'}}}]
+    VapidPublicKeyResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [publicKey], properties: {publicKey: {type: string, minLength: 87, maxLength: 87, pattern: '^[A-Za-z0-9_-]{87}$'}}}}}]
+    WebPushSubscriptionDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [disabled, subscriptionId], properties: {disabled: {type: boolean, const: true}, subscriptionId: {type: string, format: uuid}}}}}]
+    NotificationWebhookRequest:
+      oneOf:
+        - {$ref: '#/components/schemas/CompactNotificationWebhookRequest'}
+        - {$ref: '#/components/schemas/SupabaseNotificationInsertWebhook'}
+    CompactNotificationWebhookRequest:
+      type: object
+      additionalProperties: false
+      required: [notificationId]
+      properties: {notificationId: {type: string, format: uuid}}
+    SupabaseNotificationInsertWebhook:
+      type: object
+      additionalProperties: false
+      required: [type, table, schema, record]
+      properties:
+        type: {type: string, const: INSERT}
+        table: {type: string, const: notifications}
+        schema: {type: string, const: public}
+        record:
+          type: object
+          required: [id]
+          properties: {id: {type: string, format: uuid}}
+          additionalProperties: true
+        old_record: {type: [object, 'null'], additionalProperties: true}
+    WebPushDrainResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [claimed, sent, invalid, retried, failed]
+              properties:
+                claimed: {type: integer, minimum: 0, maximum: 50}
+                sent: {type: integer, minimum: 0, maximum: 50}
+                invalid: {type: integer, minimum: 0, maximum: 50}
+                retried: {type: integer, minimum: 0, maximum: 50}
+                failed: {type: integer, minimum: 0, maximum: 50}
+    GroupCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        description: {type: [string, 'null'], maxLength: 500}
+    GroupPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        description: {type: [string, 'null'], maxLength: 500}
+        simplifiedDebts: {type: boolean}
+    GroupSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, imageUrl, createdBy, defaultCurrency, simplifiedDebts, createdAt, updatedAt, memberCount, currentUserBalance, currentUserRole]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: [string, 'null']}
+        imageUrl: {type: [string, 'null']}
+        createdBy: {type: string, format: uuid}
+        defaultCurrency: {type: string, const: INR}
+        simplifiedDebts: {type: boolean}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        memberCount: {type: integer, minimum: 1}
+        currentUserBalance: {$ref: '#/components/schemas/SignedMoney'}
+        currentUserRole: {type: string, enum: [admin, editor]}
+    GroupResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GroupSummary'}}}]
+    GroupListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/GroupSummary'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    GroupDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, required: [deleted, groupId], properties: {deleted: {type: boolean, const: true}, groupId: {type: string, format: uuid}}}}}]
+    GroupMemberAdd:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties: {email: {type: string, format: email, maxLength: 320}}
+    GroupMember:
+      type: object
+      additionalProperties: false
+      required: [membershipId, userId, role, joinedAt, fullName, email, avatarUrl, upiIdAvailable]
+      properties:
+        membershipId: {type: string, format: uuid}
+        userId: {type: string, format: uuid}
+        role: {type: string, enum: [admin, editor]}
+        joinedAt: {type: string, format: date-time}
+        fullName: {type: string}
+        email: {type: string, format: email}
+        avatarUrl: {type: [string, 'null']}
+        upiIdAvailable: {type: boolean}
+    GroupMemberResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GroupMember'}}}]
+    GroupMemberListResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GroupMember'}}}}]
+    GroupMemberDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, required: [removed, groupId, userId], properties: {removed: {type: boolean, const: true}, groupId: {type: string, format: uuid}, userId: {type: string, format: uuid}}}}}]
+    GroupImageTicketResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [bucket, path, token, signedUrl, expiresIn]
+              properties:
+                bucket: {type: string, const: group-images}
+                path: {type: string}
+                token: {type: string}
+                signedUrl: {type: string, format: uri}
+                expiresIn: {type: integer}
+    AvatarTicketResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [bucket, path, token, signedUrl, expiresIn]
+              properties:
+                bucket: {type: string, const: avatars}
+                path: {type: string}
+                token: {type: string}
+                signedUrl: {type: string, format: uri}
+                expiresIn: {type: integer}
+    SuccessEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: {}
+        meta:
+          type: object
+          required: [requestId]
+          properties:
+            requestId: {type: string}
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId, retryable]
+          properties:
+            code: {$ref: '#/components/schemas/ApiErrorCode'}
+            message: {type: string}
+            requestId: {type: string}
+            retryable: {type: boolean}
+            fieldErrors:
+              type: object
+              additionalProperties:
+                type: array
+                items: {type: string}
+    ApiErrorCode:
+      type: string
+      enum:
+        - AUTH_REQUIRED
+        - FORBIDDEN
+        - NOT_FOUND
+        - VALIDATION_ERROR
+        - CONFLICT
+        - MEMBER_ALREADY_EXISTS
+        - REGISTERED_USER_NOT_FOUND
+        - UNRESOLVED_MEMBER_DEBT
+        - GROUP_HISTORY_RETAINED
+        - PENDING_SETTLEMENT_EXISTS
+        - SETTLEMENT_EXCEEDS_BALANCE
+        - SETTLEMENT_CHANGED
+        - LINKED_TRANSACTION_READ_ONLY
+        - SETTLED_EXPENSE_IMMUTABLE
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_REUSED
+        - RATE_LIMITED
+        - DEPENDENCY_UNAVAILABLE
+        - INTERNAL_ERROR
+  responses:
+    AuthRequired:
+      description: Missing or invalid session.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Forbidden:
+      description: Same-origin, CSRF, or authorization check failed.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    NotFound:
+      description: Entity absent or hidden by policy.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    ValidationError:
+      description: Invalid fields.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    RateLimited:
+      description: Durable or provider rate limit exceeded. Retry-After is returned when known.
+      headers:
+        Retry-After:
+          schema: {type: integer, minimum: 1}
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    DependencyUnavailable:
+      description: Required dependency is temporarily unavailable.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Conflict:
+      description: Idempotency conflict or linked transaction is read-only.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    PreconditionRequired:
+      description: Required Idempotency-Key header is missing or invalid.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}

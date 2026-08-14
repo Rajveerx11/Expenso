@@ -5,4 +5,11 @@ build/
 .env
 .env*.local
 *.log
+artifacts/evidence/*.webm
+artifacts/evidence/*-trace.zip
+artifacts/playwright-report/
+artifacts/playwright-results/
+artifacts/playwright-results.json
+__pycache__/
+*.pyc
 .DS_Store

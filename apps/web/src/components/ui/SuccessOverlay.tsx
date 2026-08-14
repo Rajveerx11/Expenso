@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 interface SuccessOverlayProps {
   show: boolean;
@@ -8,23 +8,19 @@ interface SuccessOverlayProps {
 }
 
 export function SuccessOverlay({ show, message = 'Done!', onComplete }: SuccessOverlayProps) {
-  const [visible, setVisible] = useState(false);
-
   useEffect(() => {
-    if (show) {
-      setVisible(true);
-      const t = setTimeout(() => {
-        setVisible(false);
-        onComplete?.();
-      }, 1500);
-      return () => clearTimeout(t);
-    }
-  }, [show]);
+    if (!show) return;
+    const timeout = setTimeout(() => onComplete?.(), 1500);
+    return () => clearTimeout(timeout);
+  }, [show, onComplete]);
 
-  if (!visible) return null;
+  if (!show) return null;
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       style={{
         position: 'fixed', inset: 0, zIndex: 200, display: 'flex',
         alignItems: 'center', justifyContent: 'center',

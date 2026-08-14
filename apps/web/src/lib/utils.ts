@@ -48,9 +48,16 @@ export function moneySign(amount: string | number): 'positive' | 'negative' | 'z
 }
 
 // ─── Date Formatting ─────────────────────────────────────────
+function parseDisplayDate(dateStr: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  return match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(dateStr);
+}
+
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
+  const date = parseDisplayDate(dateStr);
   return date.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -60,7 +67,7 @@ export function formatDate(dateStr: string): string {
 
 export function formatDateShort(dateStr: string): string {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
+  const date = parseDisplayDate(dateStr);
   return date.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -96,7 +103,8 @@ export function formatRelativeTime(dateStr: string): string {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 export function currentMonth(): string {
@@ -171,16 +179,16 @@ export function calculateEqualSplit(totalAmount: string, memberIds: string[]): R
   const totalCents = Math.round(parseFloat(totalAmount) * 100);
   const baseCents = Math.floor(totalCents / memberIds.length);
   const remainder = totalCents - baseCents * memberIds.length;
-  
+
   // Sort for determinism
   const sorted = [...memberIds].sort();
   const result: Record<string, string> = {};
-  
+
   sorted.forEach((id, i) => {
     const cents = baseCents + (i < remainder ? 1 : 0);
     result[id] = (cents / 100).toFixed(2);
   });
-  
+
   return result;
 }
 
@@ -213,9 +221,9 @@ export function isValidAmount(amount: string): boolean {
 }
 
 // ─── Avatar Color ─────────────────────────────────────────────
-const AVATAR_COLORS = [
-  '#4F46E5', '#7C3AED', '#DB2777', '#DC2626',
-  '#D97706', '#059669', '#0284C7', '#0891B2',
+export const AVATAR_COLORS = [
+  '#4338CA', '#6D28D9', '#BE185D', '#B91C1C',
+  '#92400E', '#047857', '#0369A1', '#0E7490',
 ];
 
 export function getAvatarColor(name: string): string {

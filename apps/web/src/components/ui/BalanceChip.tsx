@@ -14,16 +14,15 @@ export function BalanceChip({ balance, size = 'md' }: BalanceChipProps) {
     : sign === 'negative' ? 'chip chip-negative'
     : 'chip chip-neutral';
 
-  const label = sign === 'positive' ? `Owed ${amount}`
-    : sign === 'negative' ? `Owes ${amount}`
-    : 'Settled';
-
-  const symbol = sign === 'positive' ? '+' : sign === 'negative' ? '-' : '';
+  const label = sign === 'positive'
+    ? `You are owed ${amount}`
+    : sign === 'negative'
+      ? `You owe ${amount}`
+      : 'Settled up';
 
   return (
-    <span className={chipClass} style={{ fontSize: size === 'sm' ? '11px' : '12px' }}>
-      {sign !== 'zero' && <span>{symbol}</span>}
-      {sign !== 'zero' ? amount : 'Settled up'}
+    <span className={chipClass} style={{ fontSize: size === 'sm' ? '11px' : '12px', whiteSpace: 'nowrap' }}>
+      {label}
     </span>
   );
 }

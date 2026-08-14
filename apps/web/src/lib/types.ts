@@ -83,7 +83,7 @@ export interface GroupExpense {
   title: string;
   totalAmount: Money;
   category: string;
-  splitType: SplitType;
+  splitType: SplitType | 'shares';
   note: string | null;
   expenseDate: ISODate;
   createdAt: ISODateTime;
@@ -136,6 +136,14 @@ export interface AppNotification {
   href: string;
   isRead: boolean;
   createdAt: ISODateTime;
+}
+
+export interface WebPushSubscriptionSummary {
+  id: UUID;
+  expirationTime: number | null;
+  userAgent: string | null;
+  createdAt: ISODateTime;
+  lastSuccessAt: ISODateTime | null;
 }
 
 export interface DashboardData {
