@@ -53,4 +53,17 @@ describe('foundation OpenAPI contract', () => {
     expect(spec.match(/'429': \{\$ref: '#\/components\/responses\/RateLimited'\}/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
     expect(spec.match(/'503': \{\$ref: '#\/components\/responses\/DependencyUnavailable'\}/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
   });
+
+  it('documents three server-authoritative shared-expense modes and balances', () => {
+    expect(spec).toContain('/v1/groups/{groupId}/expenses/{expenseId}:');
+    expect(spec).toContain('/v1/groups/{groupId}/balances:');
+    expect(spec).toContain("const: percentage");
+    expect(spec).toContain('Optional browser preview ignored by server allocation.');
+    expect(spec).toContain('GroupExpenseCreateResponse');
+    expect(spec).toContain('GroupBalanceListResponse');
+    expect(spec.match(/NonnegativeMoneyInput/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(spec).toContain('- SETTLED_EXPENSE_IMMUTABLE');
+    expect(spec).toContain("pattern: '^(?=.*[1-9])\\d{1,10}(?:\\.\\d{1,2})?$'");
+    expect(spec).toContain("pattern: '^(?=.*[1-9])(?:100(?:\\.0{1,4})?|\\d{1,2}(?:\\.\\d{1,4})?)$'");
+  });
 });

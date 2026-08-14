@@ -3,6 +3,11 @@ set -euo pipefail
 
 database_url="${1:?database URL is required}"
 
+now_millis() {
+  psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
+    "select floor(extract(epoch from clock_timestamp()) * 1000)::bigint"
+}
+
 wait_for_advisory_lock() {
   local application_name="$1"
   local lock_count
@@ -172,12 +177,12 @@ PGAPPNAME=issue3_personal_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_personal_create('Concurrent income A',100.00,'concurrent-create-key-a',repeat('d',64),1.5)" >/dev/null &
 personal_a=$!
 wait_for_advisory_lock issue3_personal_a
-personal_start=$(date +%s%3N)
+personal_start=$(now_millis)
 PGAPPNAME=issue3_personal_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_personal_create('Concurrent income B',200.00,'concurrent-create-key-b',repeat('e',64),0)" >/dev/null &
 personal_b=$!
 wait "$personal_b"
-personal_elapsed=$(($(date +%s%3N) - personal_start))
+personal_elapsed=$(($(now_millis) - personal_start))
 wait "$personal_a"
 if (( personal_elapsed < 1000 )); then
   echo "second personal recalculation did not wait for the user ledger lock" >&2
@@ -194,12 +199,12 @@ PGAPPNAME=issue3_group_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_group_create('24000000-0000-0000-0000-000000000097','Opposing order A','[{\"user_id\":\"14000000-0000-0000-0000-000000000097\",\"owed_amount\":1},{\"user_id\":\"14000000-0000-0000-0000-000000000098\",\"owed_amount\":1}]'::jsonb,1.5)" >/dev/null &
 group_a=$!
 wait_for_advisory_lock issue3_group_a
-group_start=$(date +%s%3N)
+group_start=$(now_millis)
 PGAPPNAME=issue3_group_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue3_concurrent_group_create('24000000-0000-0000-0000-000000000098','Opposing order B','[{\"user_id\":\"14000000-0000-0000-0000-000000000098\",\"owed_amount\":1},{\"user_id\":\"14000000-0000-0000-0000-000000000097\",\"owed_amount\":1}]'::jsonb,0)" >/dev/null &
 group_b=$!
 wait "$group_b"
-group_elapsed=$(($(date +%s%3N) - group_start))
+group_elapsed=$(($(now_millis) - group_start))
 wait "$group_a"
 if (( group_elapsed < 1000 )); then
   echo "opposing-order group mutation did not wait for sorted batch locks" >&2
@@ -216,12 +221,12 @@ PGAPPNAME=issue4_remove_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue4_remove_member_hold('24000000-0000-0000-0000-000000000096','14000000-0000-0000-0000-000000000098',1.5)" >/dev/null &
 remove_a=$!
 wait_for_advisory_lock issue4_remove_a
-membership_start=$(date +%s%3N)
+membership_start=$(now_millis)
 PGAPPNAME=issue4_add_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue4_add_member('24000000-0000-0000-0000-000000000096','group-lock-b@test.local','local-test-rate-limit-secret-1234567890')" >/dev/null &
 add_b=$!
 wait "$add_b"
-membership_elapsed=$(($(date +%s%3N) - membership_start))
+membership_elapsed=$(($(now_millis) - membership_start))
 wait "$remove_a"
 if (( membership_elapsed < 1000 )); then
   echo "concurrent membership add did not wait for serialized removal" >&2
@@ -240,10 +245,10 @@ PGAPPNAME=issue4_remove_admin_a psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue4_remove_member_hold('24000000-0000-0000-0000-000000000096','14000000-0000-0000-0000-000000000098',1.5)" >/dev/null &
 remove_admin_a=$!
 wait_for_advisory_lock issue4_remove_admin_a
-removed_admin_start=$(date +%s%3N)
+removed_admin_start=$(now_millis)
 removed_admin_result=$(PGAPPNAME=issue4_removed_admin_b psql "$database_url" -v ON_ERROR_STOP=1 -Atqc \
   "select public.issue4_update_as_removed_admin('24000000-0000-0000-0000-000000000096')")
-removed_admin_elapsed=$(($(date +%s%3N) - removed_admin_start))
+removed_admin_elapsed=$(($(now_millis) - removed_admin_start))
 wait "$remove_admin_a"
 if (( removed_admin_elapsed < 1000 )); then
   echo "waiting removed admin did not block behind membership revocation" >&2

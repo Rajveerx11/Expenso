@@ -402,6 +402,69 @@ paths:
         '422': {$ref: '#/components/responses/ValidationError'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/expenses:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupExpenses
+      security: [{cookieSession: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 500}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+      responses:
+        '200': {description: Paged member-authorized shared expenses, content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    post:
+      operationId: createGroupExpense
+      security: [{cookieSession: [], csrfToken: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseCreate'}}}
+      responses:
+        '201': {description: "Server-allocated atomic expense, mirrors, and replay state", content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseCreateResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/expenses/{expenseId}:
+    parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/ExpenseId'}]
+    get:
+      operationId: getGroupExpense
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Member-authorized expense and original splits, content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseDetailResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    delete:
+      operationId: deleteGroupExpense
+      security: [{cookieSession: [], csrfToken: []}]
+      responses:
+        '200': {description: Unsettled payer/admin expense reversed atomically, content: {application/json: {schema: {$ref: '#/components/schemas/GroupExpenseDeleteResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/groups/{groupId}/balances:
+    parameters: [{$ref: '#/components/parameters/GroupId'}]
+    get:
+      operationId: listGroupBalances
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Caller-relative pairwise balances, content: {application/json: {schema: {$ref: '#/components/schemas/GroupBalanceListResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
   /v1/groups/{groupId}/members/{userId}:
     parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/UserId'}]
     delete:
@@ -735,10 +798,169 @@ components:
       pattern: '^-?\d{1,12}\.\d{2}$'
     PositiveMoneyInput:
       type: string
+      pattern: '^(?=.*[1-9])\d{1,10}(?:\.\d{1,2})?$'
+    NonnegativeMoneyInput:
+      type: string
       pattern: '^\d{1,10}(?:\.\d{1,2})?$'
     PersonalCategory:
       type: string
       enum: [Food, Transport, Shopping, Entertainment, Bills, Health, Education, Travel, Groceries, Rent, Salary, Freelance, Other]
+    GroupExpenseCreate:
+      oneOf:
+        - {$ref: '#/components/schemas/GroupExpenseEqualCreate'}
+        - {$ref: '#/components/schemas/GroupExpenseExactCreate'}
+        - {$ref: '#/components/schemas/GroupExpensePercentageCreate'}
+      discriminator: {propertyName: splitType}
+    GroupExpenseEqualCreate:
+      type: object
+      additionalProperties: false
+      required: [paidBy, title, totalAmount, category, splitType, expenseDate, splits]
+      properties:
+        paidBy: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        totalAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        splitType: {type: string, const: equal}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId]
+            properties:
+              userId: {type: string, format: uuid}
+              owedAmount: {$ref: '#/components/schemas/NonnegativeMoneyInput', description: Optional browser preview ignored by server allocation.}
+    GroupExpenseExactCreate:
+      type: object
+      additionalProperties: false
+      required: [paidBy, title, totalAmount, category, splitType, expenseDate, splits]
+      properties:
+        paidBy: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        totalAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        splitType: {type: string, const: exact}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId, owedAmount]
+            properties:
+              userId: {type: string, format: uuid}
+              owedAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+    GroupExpensePercentageCreate:
+      type: object
+      additionalProperties: false
+      required: [paidBy, title, totalAmount, category, splitType, expenseDate, splits]
+      properties:
+        paidBy: {type: string, format: uuid}
+        title: {type: string, minLength: 1, maxLength: 120}
+        totalAmount: {$ref: '#/components/schemas/PositiveMoneyInput'}
+        category: {$ref: '#/components/schemas/PersonalCategory'}
+        splitType: {type: string, const: percentage}
+        note: {type: [string, 'null'], maxLength: 500}
+        expenseDate: {type: string, format: date}
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId, percentage]
+            properties:
+              userId: {type: string, format: uuid}
+              percentage: {type: string, pattern: '^(?=.*[1-9])(?:100(?:\.0{1,4})?|\d{1,2}(?:\.\d{1,4})?)$'}
+              owedAmount: {$ref: '#/components/schemas/NonnegativeMoneyInput', description: Optional browser preview ignored by server allocation.}
+    GroupExpense:
+      type: object
+      additionalProperties: false
+      required: [id, groupId, paidBy, paidByName, title, totalAmount, category, splitType, note, expenseDate, createdAt, updatedAt, canDelete]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        paidBy: {type: string, format: uuid}
+        paidByName: {type: string}
+        title: {type: string}
+        totalAmount: {$ref: '#/components/schemas/Money'}
+        category: {type: string}
+        splitType: {type: string, enum: [equal, exact, percentage, shares], description: shares is read-only legacy compatibility.}
+        note: {type: [string, 'null']}
+        expenseDate: {type: string, format: date}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        canDelete: {type: boolean}
+    ExpenseSplit:
+      type: object
+      additionalProperties: false
+      required: [id, expenseId, userId, userName, owedAmount, settledAmount, isSettled, settledAt]
+      properties:
+        id: {type: string, format: uuid}
+        expenseId: {type: string, format: uuid}
+        userId: {type: string, format: uuid}
+        userName: {type: string}
+        owedAmount: {$ref: '#/components/schemas/Money'}
+        settledAmount: {$ref: '#/components/schemas/Money'}
+        isSettled: {type: boolean}
+        settledAt: {type: [string, 'null'], format: date-time}
+    GroupExpenseDetail:
+      type: object
+      additionalProperties: false
+      required: [expense, splits]
+      properties:
+        expense: {$ref: '#/components/schemas/GroupExpense'}
+        splits: {type: array, items: {$ref: '#/components/schemas/ExpenseSplit'}}
+    GroupExpenseListResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data: {type: array, items: {$ref: '#/components/schemas/GroupExpense'}}
+            meta:
+              type: object
+              required: [requestId, nextCursor]
+              properties:
+                requestId: {type: string}
+                nextCursor: {type: [string, 'null']}
+    GroupExpenseDetailResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/GroupExpenseDetail'}}}]
+    GroupExpenseCreateResponse:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessEnvelope'}
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [expense, splits, replayed]
+              properties:
+                expense: {$ref: '#/components/schemas/GroupExpense'}
+                splits: {type: array, items: {$ref: '#/components/schemas/ExpenseSplit'}}
+                replayed: {type: boolean}
+    GroupExpenseDeleteResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, required: [deleted, expenseId], properties: {deleted: {type: boolean, const: true}, expenseId: {type: string, format: uuid}}}}}]
+    GroupBalance:
+      type: object
+      additionalProperties: false
+      required: [userId, userName, userAvatarUrl, userUpiId, balance, direction]
+      properties:
+        userId: {type: string, format: uuid}
+        userName: {type: string}
+        userAvatarUrl: {type: [string, 'null']}
+        userUpiId: {type: [string, 'null']}
+        balance: {$ref: '#/components/schemas/SignedMoney'}
+        direction: {type: string, enum: [owes_you, you_owe, settled]}
+    GroupBalanceListResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/GroupBalance'}}}}]
     GroupCreate:
       type: object
       additionalProperties: false
@@ -882,6 +1104,7 @@ components:
         - SETTLEMENT_EXCEEDS_BALANCE
         - SETTLEMENT_CHANGED
         - LINKED_TRANSACTION_READ_ONLY
+        - SETTLED_EXPENSE_IMMUTABLE
         - IDEMPOTENCY_KEY_REQUIRED
         - IDEMPOTENCY_KEY_REUSED
         - RATE_LIMITED

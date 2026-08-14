@@ -83,7 +83,7 @@ export interface GroupExpense {
   title: string;
   totalAmount: Money;
   category: string;
-  splitType: SplitType;
+  splitType: SplitType | 'shares';
   note: string | null;
   expenseDate: ISODate;
   createdAt: ISODateTime;
