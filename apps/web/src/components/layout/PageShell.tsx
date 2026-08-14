@@ -1,5 +1,7 @@
 'use client';
 import { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import { shouldShowMobileBottomNav } from './mobile-navigation';
 
 interface PageShellProps {
   children: ReactNode;
@@ -9,11 +11,15 @@ interface PageShellProps {
 }
 
 export function PageShell({ children, className = '', noPadding = false, noBottomPad = false }: PageShellProps) {
+  const pathname = usePathname();
+  const reserveMobileNavSpace = !noBottomPad && shouldShowMobileBottomNav(pathname);
   return (
-    <main
-      className={`page-enter ${!noBottomPad ? 'pb-nav' : ''} ${className}`}
+    <div
+      className={`page-enter ${reserveMobileNavSpace ? 'pb-nav' : ''} ${className}`}
       style={{
-        padding: noPadding ? 0 : '0 16px',
+        paddingTop: 0,
+        paddingLeft: noPadding ? 0 : 16,
+        paddingRight: noPadding ? 0 : 16,
         flex: 1,
         minHeight: 0,
         overflowY: 'auto',
@@ -21,6 +27,6 @@ export function PageShell({ children, className = '', noPadding = false, noBotto
       }}
     >
       {children}
-    </main>
+    </div>
   );
 }

@@ -1,27 +1,38 @@
 'use client';
-import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Users, ArrowRight, Bell, RefreshCw, TrendingUp, TrendingDown, Minus, CreditCard } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, ArrowRight, Bell, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PageShell } from '@/components/layout/PageShell';
-import { Avatar } from '@/components/ui/Avatar';
-import { MoneyText } from '@/components/ui/MoneyText';
 import { ExpenseCard } from '@/components/ui/ExpenseCard';
-import { PrimaryButton } from '@/components/ui/Buttons';
-import { MOCK_DASHBOARD } from '@/lib/mockData';
-import { formatMoney, getGreeting, getFirstName, formatDate } from '@/lib/utils';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation } from '@/components/ui/AsyncState';
+import { api, messageForError } from '@/lib/api/client';
+import { queryKeys } from '@/lib/api/queries';
+import { currentMonth, formatMoney, formatMonthLabel, getFirstName } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const [data] = useState(MOCK_DASHBOARD);
+  const router = useRouter();
+  const month = currentMonth();
+  const dashboardQuery = useQuery({ queryKey: queryKeys.dashboard(month), queryFn: () => api.dashboard(month) });
+  const errorPresentation = queryErrorPresentation(dashboardQuery.error, dashboardQuery.data !== undefined);
+
+  if (dashboardQuery.isPending) return <><AppHeader title="Dashboard" /><PageLoading label="Loading dashboard" /></>;
+  if (errorPresentation === 'blocking') return <><AppHeader title="Dashboard" /><PageError message={messageForError(dashboardQuery.error)} retry={() => dashboardQuery.refetch()} /></>;
+  const data = dashboardQuery.data!;
   const { profile, monthlyIncome, monthlyExpenses, monthlyNet, totalYouOwe, totalOwedToYou, recentTransactions, unreadNotificationCount } = data;
 
   return (
     <>
       <AppHeader
-        title={`${getGreeting()}, ${getFirstName(profile.fullName)} 👋`}
+        title={`Hello, ${getFirstName(profile.fullName)} 👋`}
         rightAction={
-          <Link href="/notifications" style={{ position: 'relative', display: 'flex' }}>
-            <button className="btn btn-ghost btn-icon" aria-label={`Notifications, ${unreadNotificationCount} unread`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button type="button" className="btn btn-ghost btn-icon" aria-label="Refresh dashboard" aria-busy={dashboardQuery.isFetching} disabled={dashboardQuery.isFetching} onClick={() => void dashboardQuery.refetch()}>
+              <RefreshCw size={19} aria-hidden="true" />
+            </button>
+            <Link href="/notifications" className="btn btn-ghost btn-icon" style={{ position: 'relative', display: 'flex' }} aria-label={`Notifications, ${unreadNotificationCount} unread`}>
               <Bell size={20} />
               {unreadNotificationCount > 0 && (
                 <span style={{
@@ -30,17 +41,24 @@ export default function DashboardPage() {
                   background: 'var(--color-red)', border: '2px solid var(--color-snow)',
                 }} />
               )}
-            </button>
-          </Link>
+            </Link>
+          </div>
         }
       />
 
       <PageShell>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingTop: '16px', paddingBottom: '24px' }}>
 
+          {errorPresentation === 'background' && (
+            <BackgroundRefreshError
+              retry={() => void dashboardQuery.refetch()}
+              isRetrying={dashboardQuery.isFetching}
+            />
+          )}
+
           {/* Hero Balance Card */}
           <div style={{
-            background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 60%, #818CF8 100%)',
+            background: 'linear-gradient(135deg, #3730A3 0%, #4338CA 60%, #4F46E5 100%)',
             borderRadius: '24px',
             padding: '24px',
             color: 'white',
@@ -51,22 +69,22 @@ export default function DashboardPage() {
             {/* Decorative circles */}
             <div style={{ position: 'absolute', top: -40, right: -20, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
             <div style={{ position: 'absolute', bottom: -30, right: 40, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-            
-            <p style={{ fontSize: '13px', fontWeight: 500, opacity: 0.8, marginBottom: '6px' }}>August Net Balance</p>
+
+            <p style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>{formatMonthLabel(month)} Net Balance</p>
             <div style={{ fontSize: '36px', fontWeight: 800, letterSpacing: '-1px', marginBottom: '20px' }}>
-              {formatMoney(monthlyNet)}
+              {Number(monthlyNet) < 0 ? '-' : ''}{formatMoney(monthlyNet)}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '14px', padding: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', opacity: 0.85 }}>
+              <div style={{ background: 'rgba(17,24,39,0.22)', borderRadius: '14px', padding: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <TrendingUp size={14} />
                   <span style={{ fontSize: '11px', fontWeight: 500 }}>Income</span>
                 </div>
                 <div style={{ fontSize: '17px', fontWeight: 700 }}>{formatMoney(monthlyIncome)}</div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '14px', padding: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', opacity: 0.85 }}>
+              <div style={{ background: 'rgba(17,24,39,0.22)', borderRadius: '14px', padding: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <TrendingDown size={14} />
                   <span style={{ fontSize: '11px', fontWeight: 500 }}>Spent</span>
                 </div>
@@ -103,7 +121,7 @@ export default function DashboardPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
               {[
                 { href: '/expenses/new?type=expense', emoji: '💸', label: 'Add Expense', color: '#FFE4E6', textColor: '#BE123C' },
-                { href: '/expenses/new?type=income', emoji: '💰', label: 'Add Income', color: '#D1FAE5', textColor: '#059669' },
+                { href: '/expenses/new?type=income', emoji: '💰', label: 'Add Income', color: '#D1FAE5', textColor: '#047857' },
                 { href: '/groups/new', emoji: '👥', label: 'New Group', color: 'var(--color-primary-lightest)', textColor: 'var(--color-primary-deep)' },
               ].map(action => (
                 <Link key={action.href} href={action.href} style={{ textDecoration: 'none' }}>
@@ -130,9 +148,10 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {recentTransactions.length === 0 && <EmptyState icon="🧾" title="No activity yet" description="Add income or an expense to begin your ledger." />}
               {recentTransactions.map((tx, i) => (
                 <div key={tx.id} className={`animate-slideUp stagger-${Math.min(i + 1, 5)}`}>
-                  <ExpenseCard transaction={tx} />
+                  <ExpenseCard transaction={tx} onClick={() => router.push(`/expenses/${tx.id}`)} />
                 </div>
               ))}
             </div>

@@ -1,9 +1,12 @@
 # Expenso Web Application Rebuild — Master Product, UX, API, and Backend Blueprint
 
-**Document status:** Implementation contract  
-**Version:** 2.0 — web architecture revision  
-**Prepared:** 2026-08-13  
-**Audience:** Frontend owner, backend owner, coding agents, reviewers, testers  
+**Document status:** Implementation contract
+
+**Version:** 2.0 — web architecture revision
+
+**Prepared:** 2026-08-13
+
+**Audience:** Frontend owner, backend owner, coding agents, reviewers, testers
 **Source audited:** Existing Kotlin/Jetpack Compose application, active Supabase migrations, notification function, tests, and project documentation in this repository
 
 ---
@@ -662,11 +665,15 @@ Use Inter when bundled; system sans-serif is fallback.
 
 ### 8.4 Spacing and shape
 
-Spacing scale: 4, 8, 12, 16, 24, 32, 48 CSS pixels.  
-Radius scale: 8, 12, 16, 24, full.  
-Page gutters: 16 on small screens, 24 on tablet, 32 on desktop.  
-Main content max width: 1440; data-entry forms max width: 720.  
-Major card padding: 16–24.  
+Spacing scale: 4, 8, 12, 16, 24, 32, 48 CSS pixels.
+
+Radius scale: 8, 12, 16, 24, full.
+
+Page gutters: 16 on small screens, 24 on tablet, 32 on desktop.
+
+Main content max width: 1440; data-entry forms max width: 720.
+
+Major card padding: 16–24.
 Glass blur target: 20; reduce or remove when `prefers-reduced-transparency`, low performance, or browser support requires it.
 
 Core breakpoints are mobile-first: default below 640, compact tablet from 640, desktop shell from 1024, and wide layout from 1280. Breakpoints guide composition, not device detection. No required action may disappear merely because width changes.
@@ -1017,7 +1024,7 @@ balance(M) =
 
 ### 11.6 Personal ledger semantics
 
-`totalIncome = sum(personal transactions where type=income)`  
+`totalIncome = sum(personal transactions where type=income)`
 `totalBalance = income - expenses`
 
 Each group split creates one linked personal expense for that user's share. A settlement does not change historical spending, so it does not change expense analytics. If a future product needs bank-style cash flow, add a separate cash ledger; do not overload `personal_expenses`.
@@ -1897,37 +1904,42 @@ The cron route verifies `Authorization: Bearer ${CRON_SECRET}`, uses a database 
 
 ### Phase 0 — Contract foundation
 
-**Shared:** create monorepo, contracts, domain money/split module, fixtures, OpenAPI, CI, and ownership rules.  
+**Shared:** create monorepo, contracts, domain money/split module, fixtures, OpenAPI, CI, and ownership rules.
 **Exit:** mocked website can call the generated same-origin client; API routes validate the same schemas.
 
 ### Phase 1 — Auth, profile, shell
 
-**Frontend:** responsive Next.js shell, theme, routes, auth UI, loading/error boundaries, profile screens.  
-**Backend:** SSR cookie/session plumbing, profile API, upload ticket, protected layouts, RLS verification.  
+**Frontend:** responsive Next.js shell, theme, routes, auth UI, loading/error boundaries, profile screens.
+
+**Backend:** SSR cookie/session plumbing, profile API, upload ticket, protected layouts, RLS verification.
 **Exit:** sign-up/sign-in/OAuth callback/onboarding/profile/sign-out work in Vercel Preview and local development.
 
 ### Phase 2 — Personal finance
 
-**Frontend:** home, transactions, forms, month/filter/analytics.  
-**Backend:** expense CRUD, analytics, dashboard aggregation, linked-item guards.  
+**Frontend:** home, transactions, forms, month/filter/analytics.
+
+**Backend:** expense CRUD, analytics, dashboard aggregation, linked-item guards.
 **Exit:** manual ledger acceptance tests pass.
 
 ### Phase 3 — Groups
 
-**Frontend:** list/create/detail/settings/member UI.  
-**Backend:** safe group/member RPC wrappers, summaries, images.  
+**Frontend:** list/create/detail/settings/member UI.
+
+**Backend:** safe group/member RPC wrappers, summaries, images.
 **Exit:** two users share a group with correct roles and isolation.
 
 ### Phase 4 — Shared expenses
 
-**Frontend:** three split modes, detail, delete flow.  
-**Backend:** atomic creation/deletion, balances, idempotency, notifications.  
+**Frontend:** three split modes, detail, delete flow.
+
+**Backend:** atomic creation/deletion, balances, idempotency, notifications.
 **Exit:** financial and concurrency tests pass.
 
 ### Phase 5 — Settlements, UPI, and Web Push
 
-**Frontend:** mobile-browser UPI launch, desktop QR/copy fallback, claim, confirmation page, notification inbox/URLs, service worker and permission UX.  
-**Backend:** settlement functions/routes, outbox delivery, Web Push subscription lifecycle, post-response/webhook send, cron retry.  
+**Frontend:** mobile-browser UPI launch, desktop QR/copy fallback, claim, confirmation page, notification inbox/URLs, service worker and permission UX.
+
+**Backend:** settlement functions/routes, outbox delivery, Web Push subscription lifecycle, post-response/webhook send, cron retry.
 **Exit:** two user accounts complete partial confirm/reject flows across desktop and mobile browsers; inbox remains correct when push is denied.
 
 ### Phase 6 — Hardening and release

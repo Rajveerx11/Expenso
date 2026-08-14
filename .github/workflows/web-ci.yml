@@ -1,0 +1,166 @@
+name: Web CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
+      - name: Start isolated Supabase stack
+        run: supabase start
+      - name: Run migration and pgTAP tests
+        run: supabase test db
+      - name: Run personal-finance concurrency tests
+        run: bash supabase/tests/personal_finance_concurrency.sh "$(supabase status -o json | jq -r '.DB_URL')"
+      - name: Run shared-expense concurrency tests
+        run: bash supabase/tests/shared_expense_concurrency.sh "$(supabase status -o json | jq -r '.DB_URL')"
+      - name: Run settlement concurrency tests
+        run: bash supabase/tests/settlement_concurrency.sh "$(supabase status -o json | jq -r '.DB_URL')"
+      - name: Run Web Push concurrency tests
+        run: bash supabase/tests/web_push_concurrency.sh "$(supabase status -o json | jq -r '.DB_URL')"
+
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Database contract tests
+        working-directory: .
+        run: python -m unittest discover -s supabase/tests -p 'test_*.py'
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_public
+          NEXT_PUBLIC_SITE_URL: https://expenso.example
+          APP_ALLOWED_ORIGINS: https://expenso.example
+          RATE_LIMIT_SALT: ci-rate-limit-salt-0000000000000001
+          RATE_LIMIT_SECRET: sentinel-rate-secret-000000000000001
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: sentinel-service-role-000000000001
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          VAPID_PUBLIC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          VAPID_PRIVATE_KEY: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+          VAPID_SUBJECT: mailto:ci@expenso.test
+          CRON_SECRET: sentinel-cron-secret-000000000000001
+          DATABASE_WEBHOOK_SECRET: sentinel-webhook-secret-000000000001
+      - name: Verify server secrets stay out of browser artifacts
+        run: npm run verify:client-secrets
+        env:
+          SECRET_SENTINELS: sentinel-rate-secret-000000000000001,sentinel-service-role-000000000001,BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB,sentinel-cron-secret-000000000000001,sentinel-webhook-secret-000000000001
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Start isolated Supabase stack
+        run: supabase start
+      - name: Configure isolated application
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_json="$(supabase status -o json)"
+          rate_secret='issue7-ci-rate-limit-secret-2026-08-14'
+          database_container="$(docker ps --filter 'name=supabase_db_' --format '{{.Names}}' | head -n 1)"
+          test -n "$database_container"
+          docker exec "$database_container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "select vault.create_secret('$rate_secret', 'expenso_auth_rate_limit_secret');"
+          vapid_json="$(cd apps/web && node -e "console.log(JSON.stringify(require('web-push').generateVAPIDKeys()))")"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r '.API_URL' <<<"$status_json")"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(jq -r '.PUBLISHABLE_KEY' <<<"$status_json")"
+            echo 'NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000'
+            echo 'APP_ALLOWED_ORIGINS=http://127.0.0.1:3000,http://localhost:3000'
+            echo 'RATE_LIMIT_SALT=issue7-ci-rate-limit-salt-2026-08-14'
+            echo "RATE_LIMIT_SECRET=$rate_secret"
+            echo "SUPABASE_URL=$(jq -r '.API_URL' <<<"$status_json")"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(jq -r '.SERVICE_ROLE_KEY' <<<"$status_json")"
+            echo "NEXT_PUBLIC_VAPID_PUBLIC_KEY=$(jq -r '.publicKey' <<<"$vapid_json")"
+            echo "VAPID_PUBLIC_KEY=$(jq -r '.publicKey' <<<"$vapid_json")"
+            echo "VAPID_PRIVATE_KEY=$(jq -r '.privateKey' <<<"$vapid_json")"
+            echo 'VAPID_SUBJECT=mailto:ci@expenso.test'
+            echo 'CRON_SECRET=issue7-ci-cron-secret-2026-08-14-0001'
+            echo 'DATABASE_WEBHOOK_SECRET=issue7-ci-webhook-secret-2026-08-14'
+          } >> "$GITHUB_ENV"
+      - name: Install browser engines
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Start web application
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          npm --prefix apps/web run dev -- --hostname 127.0.0.1 --port 3000 > artifacts/e2e-server.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/login > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat artifacts/e2e-server.log
+          exit 1
+      - name: Run browser and accessibility end-to-end suite
+        working-directory: apps/web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3000
+        run: npm run test:e2e
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-7-browser-evidence
+          path: |
+            artifacts/e2e-server.log
+            artifacts/evidence
+            artifacts/verification-report.html
+            artifacts/playwright-report
+            artifacts/playwright-results
+            artifacts/playwright-results.json
+          if-no-files-found: warn
