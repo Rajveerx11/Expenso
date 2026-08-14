@@ -208,7 +208,7 @@ function SettleUpFlow(options: {
       });
       setCreatedSettlementId(result.settlement.id);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.settlements(group.id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.settlements(group.id), refetchType: 'none' }),
         queryClient.invalidateQueries({ queryKey: queryKeys.balances(group.id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.group(group.id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.groups }),
