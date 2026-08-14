@@ -83,12 +83,25 @@ describe('health routes', () => {
   });
 
   it('returns ready only when Supabase Auth responds and maps outage to 503', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response('{}', { status: 200 })));
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(Response.json(true)));
     expect((await readyGet(new Request('https://expenso.example/api/readyz'))).status).toBe(200);
     vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new TypeError('offline')));
     const unavailable = await readyGet(new Request('https://expenso.example/api/readyz'));
     expect(unavailable.status).toBe(503);
     expect(await errorCode(unavailable)).toBe('DEPENDENCY_UNAVAILABLE');
+  });
+
+  it('reports unavailable when Auth is healthy but the Expenso schema is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 404 })));
+
+    const response = await readyGet(new Request('https://expenso.example/api/readyz'));
+
+    expect(response.status).toBe(503);
+    expect(await errorCode(response)).toBe('DEPENDENCY_UNAVAILABLE');
   });
 });
 
