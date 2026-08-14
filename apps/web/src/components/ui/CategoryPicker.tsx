@@ -1,20 +1,22 @@
 'use client';
 import { CATEGORIES } from '@/lib/types';
-import { cn } from '@/lib/utils';
 
 interface CategoryPickerProps {
   selected: string;
   onChange: (category: string) => void;
   expenseOnly?: boolean;
+  'aria-labelledby'?: string;
+  'aria-describedby'?: string;
+  role?: string;
 }
 
-export function CategoryPicker({ selected, onChange, expenseOnly = false }: CategoryPickerProps) {
+export function CategoryPicker({ selected, onChange, expenseOnly = false, ...groupProps }: CategoryPickerProps) {
   const categories = expenseOnly
     ? CATEGORIES.filter(c => !['Salary', 'Freelance'].includes(c.id))
     : CATEGORIES;
 
   return (
-    <div className="category-grid">
+    <div className="category-grid" role="group" {...groupProps}>
       {categories.map(cat => {
         const isSelected = selected === cat.id;
         return (

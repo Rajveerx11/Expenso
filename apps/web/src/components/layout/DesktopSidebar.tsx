@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, Users, User, Bell, LogOut, Wallet } from 'lucide-react';
+import { Home, Receipt, Users, User, Bell, Wallet } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 
 const NAV_ITEMS = [
@@ -54,7 +54,7 @@ export function DesktopSidebar({ userName = 'User', userEmail = '', userAvatar =
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <nav aria-label="Main navigation" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
           const badge = label === 'Notifications' && unreadCount > 0 ? unreadCount : 0;
@@ -69,13 +69,14 @@ export function DesktopSidebar({ userName = 'User', userEmail = '', userAvatar =
                 background: isActive ? 'var(--color-primary-lightest)' : 'transparent',
                 fontWeight: isActive ? 600 : 400, fontSize: '15px',
                 transition: 'all 0.1s ease', position: 'relative',
+                minHeight: 44,
               }}
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
               {label}
               {badge > 0 && (
-                <span style={{
+                <span aria-label={`${badge} unread notifications`} style={{
                   marginLeft: 'auto', background: 'var(--color-primary-deep)', color: 'white',
                   borderRadius: '10px', fontSize: '11px', fontWeight: 700,
                   padding: '2px 7px', minWidth: '20px', textAlign: 'center',

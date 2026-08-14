@@ -30,7 +30,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const { supabaseUrl, supabasePublishableKey } = getRuntimeConfig();
   const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
     cookieOptions: {
-      httpOnly: false,
+      httpOnly: true,
       path: '/',
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
@@ -41,7 +41,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         requestHeaders.set('cookie', request.cookies.toString());
         response = nextResponse();
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, { ...options, httpOnly: true }));
       },
     },
   });

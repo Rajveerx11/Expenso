@@ -54,6 +54,8 @@ select vault.create_secret(
 
 The public RPC remains callable by pre-auth routes, but rejects callers without this server-only secret before any write. Expired keys are removed automatically and a hard 100,000-key ceiling prevents unbounded growth.
 
+Local development falls back to a bounded process-local throttle only when PostgREST reports that `check_auth_rate_limit` is absent. This keeps login usable while initially configuring a project. Production remains fail-closed, so apply the migration and create the matching Vault secret before deployment.
+
 ## Authentication flow
 
 1. A page request receives a double-submit CSRF cookie and a per-request CSP nonce from Next.js Proxy.
@@ -98,6 +100,7 @@ The public RPC remains callable by pre-auth routes, but rejects callers without 
 | GET | `/api/v1/notifications` | Yes | Page the persistent owned inbox. |
 | POST | `/api/v1/notifications/{notificationId}/read` | Yes | Idempotently mark one owned notification read. |
 | POST | `/api/v1/notifications/read-all` | Yes | Mark every owned notification read. |
+| GET | `/api/v1/push-subscriptions/vapid-public-key` | Yes | Return the browser-safe public VAPID key. |
 | POST | `/api/v1/push-subscriptions` | Yes | Register or rotate the current browser subscription. |
 | DELETE | `/api/v1/push-subscriptions/{subscriptionId}` | Yes | Disable one owned browser subscription. |
 | GET | `/api/internal/notifications/drain` | Cron bearer | Lease and deliver a bounded retry batch. |

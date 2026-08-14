@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
-import { connection } from 'next/server';
 import './globals.css';
 import '../styles/globals.css';
 import { Providers } from '@/components/Providers';
@@ -38,18 +37,16 @@ export const viewport: Viewport = {
   themeColor: '#4F46E5',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: 'cover',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await connection();
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={inter.variable} data-scroll-behavior="smooth">
       <body>
         <Providers>
           {children}

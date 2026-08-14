@@ -32,7 +32,7 @@ import { POST as logoutPost } from './v1/auth/logout/route';
 import { GET as meGet, PATCH as mePatch } from './v1/me/route';
 import { POST as avatarTicketPost } from './v1/me/avatar/upload-ticket/route';
 import { POST as avatarCompletePost } from './v1/me/avatar/complete/route';
-import { GET as callbackGet } from '../auth/callback/route';
+import { GET as callbackGet, firstUseDestination, isFirstAuthSignIn } from '../auth/callback/route';
 
 const userId = '00000000-0000-4000-8000-000000000001';
 const profile = {
@@ -151,6 +151,8 @@ describe('auth routes', () => {
       fullName: 'Demo User', email: 'demo@example.com', password: 'correct-horse',
     }));
     expect(signup.status).toBe(201);
+    expect(signUp.mock.calls[0][0].options.emailRedirectTo)
+      .toBe('https://expenso.example/auth/callback?next=%2Fonboarding');
     const oauth = await googlePost(mutation('/api/v1/auth/google', { next: '//evil.example' }));
     expect(oauth.status).toBe(200);
     expect(signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe('https://expenso.example/auth/callback?next=%2Fdashboard');
@@ -188,8 +190,37 @@ describe('auth routes', () => {
     mocks.createClient.mockResolvedValue({ auth: { exchangeCodeForSession } });
     const response = await callbackGet(new NextRequest('https://expenso.example/auth/callback?code=abc&next=%2Fprofile'));
     expect(response.headers.get('location')).toBe('https://expenso.example/profile');
-    const failed = await callbackGet(new NextRequest('https://expenso.example/auth/callback?next=//evil.example'));
-    expect(failed.headers.get('location')).toBe('https://expenso.example/login?error=oauth_failed');
+    const failed = await callbackGet(new NextRequest('https://expenso.example/auth/callback?next=%2Fgroups%2F123'));
+    expect(failed.headers.get('location')).toBe('https://expenso.example/login?error=oauth_failed&next=%2Fgroups%2F123');
+    const hostile = await callbackGet(new NextRequest('https://expenso.example/auth/callback?next=//evil.example'));
+    expect(hostile.headers.get('location')).toBe('https://expenso.example/login?error=oauth_failed&next=%2Fdashboard');
+  });
+
+  it('routes new OAuth users through onboarding and returning users to safe next', async () => {
+    const exchangeCodeForSession = vi.fn()
+      .mockResolvedValueOnce({
+        data: { user: { created_at: '2026-08-14T00:00:00.000Z', last_sign_in_at: '2026-08-14T00:00:01.000Z' } },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { user: { created_at: '2026-01-01T00:00:00.000Z', last_sign_in_at: '2026-08-14T00:00:00.000Z' } },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { user: { created_at: '2026-08-14T00:00:00.000Z', last_sign_in_at: '2026-08-14T00:00:00.000Z' } },
+        error: null,
+      });
+    mocks.createClient.mockResolvedValue({ auth: { exchangeCodeForSession } });
+
+    const first = await callbackGet(new NextRequest('https://expenso.example/auth/callback?code=new&next=%2Fgroups%2F123'));
+    expect(first.headers.get('location')).toBe('https://expenso.example/onboarding?next=%2Fgroups%2F123');
+    const returning = await callbackGet(new NextRequest('https://expenso.example/auth/callback?code=old&next=%2Fgroups%2F123'));
+    expect(returning.headers.get('location')).toBe('https://expenso.example/groups/123');
+    const hostile = await callbackGet(new NextRequest('https://expenso.example/auth/callback?code=hostile&next=//evil.example'));
+    expect(hostile.headers.get('location')).toBe('https://expenso.example/onboarding?next=%2Fdashboard');
+
+    expect(isFirstAuthSignIn({ created_at: 'invalid', last_sign_in_at: 'invalid' })).toBe(false);
+    expect(firstUseDestination('/onboarding')).toBe('/onboarding');
   });
 });
 

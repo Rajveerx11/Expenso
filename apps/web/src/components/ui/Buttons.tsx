@@ -1,5 +1,5 @@
 'use client';
-import { ReactNode, ButtonHTMLAttributes } from 'react';
+import { forwardRef, ReactNode, ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -24,8 +24,9 @@ export function PrimaryButton({ children, size = 'md', fullWidth = false, loadin
     <button
       className={cn('btn btn-primary', size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', fullWidth && 'w-full', className)}
       style={{ width: fullWidth ? '100%' : undefined }}
-      disabled={loading || props.disabled}
       {...props}
+      disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
     >
       {loading ? <Spinner /> : icon}
       {children}
@@ -33,27 +34,30 @@ export function PrimaryButton({ children, size = 'md', fullWidth = false, loadin
   );
 }
 
-export function SecondaryButton({ children, size = 'md', fullWidth = false, loading = false, icon, className = '', ...props }: ButtonProps) {
+export const SecondaryButton = forwardRef<HTMLButtonElement, ButtonProps>(function SecondaryButton({ children, size = 'md', fullWidth = false, loading = false, icon, className = '', ...props }, ref) {
   return (
     <button
+      ref={ref}
       className={cn('btn btn-secondary', size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', fullWidth && 'w-full', className)}
       style={{ width: fullWidth ? '100%' : undefined }}
-      disabled={loading || props.disabled}
       {...props}
+      disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
     >
       {loading ? <Spinner /> : icon}
       {children}
     </button>
   );
-}
+});
 
 export function DangerButton({ children, size = 'md', fullWidth = false, loading = false, icon, className = '', ...props }: ButtonProps) {
   return (
     <button
       className={cn('btn btn-danger', size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', fullWidth && 'w-full', className)}
       style={{ width: fullWidth ? '100%' : undefined }}
-      disabled={loading || props.disabled}
       {...props}
+      disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
     >
       {loading ? <Spinner /> : icon}
       {children}
@@ -66,8 +70,9 @@ export function OutlineButton({ children, size = 'md', fullWidth = false, loadin
     <button
       className={cn('btn btn-outline', size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', fullWidth && 'w-full', className)}
       style={{ width: fullWidth ? '100%' : undefined }}
-      disabled={loading || props.disabled}
       {...props}
+      disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
     >
       {loading ? <Spinner /> : icon}
       {children}

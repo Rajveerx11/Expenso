@@ -10,11 +10,15 @@ interface SegmentedControlProps {
   options: Option[];
   value: string;
   onChange: (value: string) => void;
+  'aria-labelledby'?: string;
+  'aria-label'?: string;
+  'aria-describedby'?: string;
+  role?: string;
 }
 
-export function SegmentedControl({ options, value, onChange }: SegmentedControlProps) {
+export function SegmentedControl({ options, value, onChange, ...groupProps }: SegmentedControlProps) {
   return (
-    <div className="tab-bar" role="group">
+    <div className="tab-bar" role="group" {...groupProps}>
       {options.map(opt => (
         <button
           key={opt.value}
