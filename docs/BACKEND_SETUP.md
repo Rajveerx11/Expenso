@@ -54,6 +54,8 @@ select vault.create_secret(
 
 The public RPC remains callable by pre-auth routes, but rejects callers without this server-only secret before any write. Expired keys are removed automatically and a hard 100,000-key ceiling prevents unbounded growth.
 
+Local development falls back to a bounded process-local throttle only when PostgREST reports that `check_auth_rate_limit` is absent. This keeps login usable while initially configuring a project. Production remains fail-closed, so apply the migration and create the matching Vault secret before deployment.
+
 ## Authentication flow
 
 1. A page request receives a double-submit CSRF cookie and a per-request CSP nonce from Next.js Proxy.

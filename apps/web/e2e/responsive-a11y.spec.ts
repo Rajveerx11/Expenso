@@ -55,7 +55,7 @@ test('responsive widths, 200% scaling, reduced motion, landmarks, and WCAG scan'
   await expectTouchTarget(page, 'Previous month');
   await expectTouchTarget(page, 'Next month');
   await page.goto('/expenses/new?type=expense');
-  await expect(page.getByRole('group', { name: 'Transaction type' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Transaction type', exact: true })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Category' })).toBeVisible();
   await page.goto('/groups/new');
   await expect(page.getByRole('group', { name: 'Add Members' })).toBeVisible();

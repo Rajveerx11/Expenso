@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { OAuthFailureAlert, oauthCallbackError, oauthRetryPath } from './login/page';
 import { EmailConfirmationScreen } from './signup/page';
-import { onboardingDestination } from '../../onboarding/page';
+import { onboardingDestination } from '../onboarding/page';
 
 describe('auth page recovery states', () => {
   it('renders a bounded OAuth callback failure and removes it before retry', () => {
