@@ -349,7 +349,7 @@ test('complete two-user finance, group, settlement, inbox, upload, authorization
 
     await bobPage.goto(groupUrl);
     await bobPage.getByRole('button', { name: 'Balances' }).click();
-    await expect(bobPage.getByText('You owe')).toBeVisible();
+    await expect(bobPage.getByLabel('Your group balances').getByText(/^You owe ₹/)).toBeVisible();
     const settleLink = bobPage.getByRole('link', { name: /Settle Up/ });
     await expectTouchTarget(settleLink);
     await settleLink.click();

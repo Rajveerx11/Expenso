@@ -55,10 +55,10 @@ test('responsive widths, 200% scaling, reduced motion, landmarks, and WCAG scan'
   await expectTouchTarget(page, 'Previous month');
   await expectTouchTarget(page, 'Next month');
   await page.goto('/expenses/new?type=expense');
-  await expect(page.getByRole('group', { name: 'Transaction type' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Transaction Type', exact: true })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Category' })).toBeVisible();
   await page.goto('/groups/new');
-  await expect(page.getByRole('group', { name: 'Add Members' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Add Members' })).toBeVisible();
   await expectTouchTarget(page, 'Add member');
   const chipEmail = `chip.${browserName}@expenso.test`;
   await page.getByPlaceholder('member@example.com').fill(chipEmail);
