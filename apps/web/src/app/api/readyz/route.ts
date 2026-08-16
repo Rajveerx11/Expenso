@@ -8,12 +8,22 @@ export async function GET(request: Request) {
   const requestId = requestIdFor(request);
   try {
     const { supabaseUrl, supabasePublishableKey } = getRuntimeConfig();
-    const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
-      headers: { apikey: supabasePublishableKey },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) {
+    const headers = { apikey: supabasePublishableKey };
+    const [authResponse, schemaResponse] = await Promise.all([
+      fetch(`${supabaseUrl}/auth/v1/health`, {
+        headers,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(3000),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/rpc/expenso_backend_ready_20260815012000`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: '{}',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(3000),
+      }),
+    ]);
+    if (!authResponse.ok || !schemaResponse.ok || await schemaResponse.json() !== true) {
       return fail(new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true }), requestId);
     }
     return ok({ status: 'ready' as const }, requestId, { isPrivate: false });

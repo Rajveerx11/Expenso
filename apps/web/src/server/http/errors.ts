@@ -96,6 +96,9 @@ interface SupabaseLikeError {
 
 export function mapDataError(error: SupabaseLikeError | null, fallbackCode: ApiErrorCode = 'INTERNAL_ERROR'): AppError {
   if (!error) return new AppError({ code: fallbackCode, status: 500 });
+  if (error.code === 'PGRST202' || error.code === 'PGRST205') {
+    return new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true, cause: error });
+  }
   if (error.code === 'PGRST116') return new AppError({ code: 'NOT_FOUND', status: 404, cause: error });
   if (error.code === '42501') return new AppError({ code: 'FORBIDDEN', status: 403, cause: error });
   if (error.code === '23505') return new AppError({ code: 'CONFLICT', status: 409, cause: error });

@@ -42,6 +42,9 @@ Web-specific migrations are ordered as follows:
 5. `20260814040000_shared_expenses_api.sql`
 6. `20260814050000_settlements_web_api.sql`
 7. `20260814051000_notifications_web_push.sql`
+8. `20260815010000_backend_readiness_and_profile_backfill.sql`
+9. `20260815011000_harden_anon_schema_privileges.sql`
+10. `20260815012000_finalize_backend_readiness.sql`
 
 After applying migrations, create the rate-limiter authorization secret once through an authorized SQL session. Use the exact same random value as `RATE_LIMIT_SECRET`:
 
@@ -53,6 +56,8 @@ select vault.create_secret(
 ```
 
 The public RPC remains callable by pre-auth routes, but rejects callers without this server-only secret before any write. Expired keys are removed automatically and a hard 100,000-key ceiling prevents unbounded growth.
+
+The final privilege-hardening migration also removes legacy direct `anon` grants that older Supabase projects may apply to new public objects. Only the constant readiness probe and secret-protected auth rate limiter remain callable before sign-in.
 
 Local development falls back to a bounded process-local throttle only when PostgREST reports that `check_auth_rate_limit` is absent. This keeps login usable while initially configuring a project. Production remains fail-closed, so apply the migration and create the matching Vault secret before deployment.
 
@@ -70,7 +75,7 @@ Local development falls back to a bounded process-local throttle only when Postg
 | Method | Route | Auth | Purpose |
 |---|---|---:|---|
 | GET | `/api/healthz` | No | Process liveness without dependency details. |
-| GET | `/api/readyz` | No | Supabase Auth readiness. |
+| GET | `/api/readyz` | No | Supabase Auth and complete Expenso database-schema readiness. |
 | GET | `/api/v1/auth/csrf` | No | Obtain the current CSRF token. |
 | POST | `/api/v1/auth/signup` | No | Email/password registration. |
 | POST | `/api/v1/auth/login` | No | Email/password session creation. |
