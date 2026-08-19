@@ -34,11 +34,15 @@ function parseUrl(name: string, value: string | undefined): string {
 export function getRuntimeConfig(): PublicRuntimeConfig {
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
     ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined)
+    ?? (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined)
+    ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
   return {
     supabaseUrl: parseUrl('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
     supabasePublishableKey: required('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', publishableKey),
-    siteUrl: parseUrl('NEXT_PUBLIC_SITE_URL', process.env.NEXT_PUBLIC_SITE_URL),
+    siteUrl: parseUrl('NEXT_PUBLIC_SITE_URL', siteUrl),
   };
 }
 
@@ -55,6 +59,12 @@ export function getAllowedOrigins(): ReadonlySet<string> {
     });
 
   const origins = new Set([siteUrl, ...configured]);
+  if (process.env.VERCEL_URL) {
+    origins.add(`https://${process.env.VERCEL_URL}`);
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    origins.add(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  }
   if (process.env.NODE_ENV !== 'production') {
     origins.add('http://localhost:3000');
     origins.add('http://127.0.0.1:3000');

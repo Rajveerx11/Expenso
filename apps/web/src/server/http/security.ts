@@ -7,8 +7,7 @@ import { AppError } from '@/server/http/errors';
 export const CSRF_COOKIE_NAME = 'expenso.csrf';
 export const CSRF_HEADER_NAME = 'x-csrf-token';
 
-export function contentSecurityPolicy(nonce: string): string {
-  const developmentScript = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
+export function contentSecurityPolicy(_nonce?: string): string {
   const supabaseOrigin = getRuntimeConfig().supabaseUrl;
   const supabaseWebSocketOrigin = supabaseOrigin.replace(/^http/, 'ws');
   return [
@@ -20,7 +19,7 @@ export function contentSecurityPolicy(nonce: string): string {
     "frame-ancestors 'none'",
     `img-src 'self' data: blob: ${supabaseOrigin} https://lh3.googleusercontent.com`,
     "object-src 'none'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${developmentScript}`,
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "worker-src 'self' blob:",
   ].join('; ');

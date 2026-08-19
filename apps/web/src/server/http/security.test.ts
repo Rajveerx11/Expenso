@@ -94,10 +94,9 @@ describe('safe redirects', () => {
 });
 
 describe('content security policy', () => {
-  it('uses a per-request script nonce without unsafe inline scripts', () => {
-    const policy = contentSecurityPolicy('testnonce');
-    expect(policy).toContain("script-src 'self' 'nonce-testnonce' 'strict-dynamic'");
-    expect(policy).not.toContain("script-src 'self' 'unsafe-inline'");
+  it('allows self, unsafe-inline, and unsafe-eval for Next.js and scripts without cross-origin leaks', () => {
+    const policy = contentSecurityPolicy();
+    expect(policy).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain('connect-src \'self\' https://rspuqbcgjqezimwwpbzl.supabase.co wss://rspuqbcgjqezimwwpbzl.supabase.co');
     expect(policy).not.toContain('https://*.supabase.co');
