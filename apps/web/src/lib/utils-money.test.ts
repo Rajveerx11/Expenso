@@ -18,7 +18,7 @@ describe('formatMoney compact output', () => {
 });
 
 describe('buildUPIUri', () => {
-  it('generates a clean P2P UPI URI without merchant tr parameter', () => {
+  it('generates a clean P2P UPI URI with literal @ in pa and without merchant tr parameter', () => {
     const uri = buildUPIUri({
       receiverUpiId: 'yuvraj2107@ibl',
       receiverName: 'Yuvraj Gandhmal',
@@ -27,8 +27,9 @@ describe('buildUPIUri', () => {
       correlationRef: 'EXPENSO-test-uuid',
     });
 
-    expect(uri).toBe('upi://pay?pa=yuvraj2107%40ibl&pn=Yuvraj+Gandhmal&am=10.00&cu=INR&tn=Expenso+settlement+for+VIT+Flatmates');
+    expect(uri).toBe('upi://pay?pa=yuvraj2107@ibl&pn=Yuvraj%20Gandhmal&am=10.00&cu=INR&tn=Expenso%20settlement%20for%20VIT%20Flatmates');
     expect(uri).not.toContain('tr=');
+    expect(uri).not.toContain('%40');
   });
 
   it('handles default notes when group name is not provided', () => {
@@ -38,7 +39,33 @@ describe('buildUPIUri', () => {
       amount: '29.50',
     });
 
-    expect(uri).toBe('upi://pay?pa=vaibhav9bansode%40okicici&pn=Vaibhav+Bansode&am=29.50&cu=INR&tn=Expenso+settlement');
+    expect(uri).toBe('upi://pay?pa=vaibhav9bansode@okicici&pn=Vaibhav%20Bansode&am=29.50&cu=INR&tn=Expenso%20settlement');
     expect(uri).not.toContain('tr=');
+  });
+
+  it('supports app-specific schemes for Google Pay, PhonePe, and Paytm', () => {
+    const gpay = buildUPIUri({
+      receiverUpiId: 'yuvraj2107@ibl',
+      receiverName: 'Yuvraj',
+      amount: '50',
+      scheme: 'gpay',
+    });
+    expect(gpay.startsWith('tez://upi/pay?pa=yuvraj2107@ibl')).toBe(true);
+
+    const phonepe = buildUPIUri({
+      receiverUpiId: 'yuvraj2107@ibl',
+      receiverName: 'Yuvraj',
+      amount: '50',
+      scheme: 'phonepe',
+    });
+    expect(phonepe.startsWith('phonepe://pay?pa=yuvraj2107@ibl')).toBe(true);
+
+    const paytm = buildUPIUri({
+      receiverUpiId: 'yuvraj2107@ibl',
+      receiverName: 'Yuvraj',
+      amount: '50',
+      scheme: 'paytm',
+    });
+    expect(paytm.startsWith('paytmmp://pay?pa=yuvraj2107@ibl')).toBe(true);
   });
 });

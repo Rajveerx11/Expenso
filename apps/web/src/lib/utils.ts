@@ -169,8 +169,9 @@ export function buildUPIUri(params: {
   amount: string;
   groupName?: string;
   correlationRef?: string;
+  scheme?: 'upi' | 'gpay' | 'phonepe' | 'paytm';
 }): string {
-  const { receiverUpiId, receiverName, amount, groupName } = params;
+  const { receiverUpiId, receiverName, amount, groupName, scheme = 'upi' } = params;
   const numAmount = parseFloat(amount);
   const formattedAmount = isNaN(numAmount) || numAmount <= 0 ? amount.trim() : numAmount.toFixed(2);
   const cleanNote = groupName?.trim()
@@ -179,14 +180,15 @@ export function buildUPIUri(params: {
   const cleanName = receiverName.trim();
   const cleanUpi = receiverUpiId.trim();
 
-  const query = new URLSearchParams();
-  query.set('pa', cleanUpi);
-  query.set('pn', cleanName);
-  query.set('am', formattedAmount);
-  query.set('cu', 'INR');
-  query.set('tn', cleanNote);
+  // Exact NPCI UPI query string with literal @ for payee address
+  const encodedName = encodeURIComponent(cleanName);
+  const encodedNote = encodeURIComponent(cleanNote);
+  const queryString = `pa=${cleanUpi}&pn=${encodedName}&am=${formattedAmount}&cu=INR&tn=${encodedNote}`;
 
-  return `upi://pay?${query.toString()}`;
+  if (scheme === 'gpay') return `tez://upi/pay?${queryString}`;
+  if (scheme === 'phonepe') return `phonepe://pay?${queryString}`;
+  if (scheme === 'paytm') return `paytmmp://pay?${queryString}`;
+  return `upi://pay?${queryString}`;
 }
 
 // ─── Split Calculation ───────────────────────────────────────

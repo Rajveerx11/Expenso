@@ -85,12 +85,36 @@ function SettleUpFlow(options: {
     ),
   });
 
-  const paymentUri = receiverUpiId && correlationRef ? buildUPIUri({
+  const paymentUri = receiverUpiId ? buildUPIUri({
     receiverUpiId,
     receiverName: receiver.fullName,
     amount: amount.trim(),
     groupName: group.name,
-    correlationRef,
+    scheme: 'upi',
+  }) : '';
+
+  const gpayUri = receiverUpiId ? buildUPIUri({
+    receiverUpiId,
+    receiverName: receiver.fullName,
+    amount: amount.trim(),
+    groupName: group.name,
+    scheme: 'gpay',
+  }) : '';
+
+  const phonepeUri = receiverUpiId ? buildUPIUri({
+    receiverUpiId,
+    receiverName: receiver.fullName,
+    amount: amount.trim(),
+    groupName: group.name,
+    scheme: 'phonepe',
+  }) : '';
+
+  const paytmUri = receiverUpiId ? buildUPIUri({
+    receiverUpiId,
+    receiverName: receiver.fullName,
+    amount: amount.trim(),
+    groupName: group.name,
+    scheme: 'paytm',
   }) : '';
 
   useEffect(() => {
@@ -317,30 +341,73 @@ function SettleUpFlow(options: {
         <>
           <div className="card" style={{ padding: 20, textAlign: 'center' }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-black)' }}>Pay {formatMoney(amount)}</h2>
-            <p style={{ fontSize: 13, color: 'var(--color-medium)', margin: '6px 0 16px' }}>Scan with any UPI app or open the payment link on this device.</p>
+            <p style={{ fontSize: 13, color: 'var(--color-medium)', margin: '6px 0 16px' }}>Scan with any UPI app or choose a payment option below.</p>
             <div style={{ display: 'inline-grid', placeItems: 'center', background: 'white', border: '1px solid var(--color-light)', borderRadius: 16, padding: 12 }}>
               <UpiQrCode value={paymentUri} label={`UPI QR code to pay ${formatMoney(amount)} to ${receiver.fullName}`} />
             </div>
-            <a href={paymentUri} onClick={beginUpiHandoff} className="btn btn-primary" style={{ display: 'flex', width: '100%', textDecoration: 'none', justifyContent: 'center', marginTop: 16 }}>
-              <ExternalLink size={18} aria-hidden="true" /> Open UPI App
+
+            <a
+              href={paymentUri}
+              onClick={beginUpiHandoff}
+              className="btn btn-primary"
+              style={{ display: 'flex', width: '100%', textDecoration: 'none', justifyContent: 'center', marginTop: 16 }}
+            >
+              <ExternalLink size={18} aria-hidden="true" /> Open in UPI App
             </a>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
+              <a
+                href={gpayUri}
+                onClick={beginUpiHandoff}
+                className="btn btn-secondary btn-sm"
+                style={{ textDecoration: 'none', justifyContent: 'center', fontSize: 12, padding: '8px 4px' }}
+              >
+                Google Pay
+              </a>
+              <a
+                href={phonepeUri}
+                onClick={beginUpiHandoff}
+                className="btn btn-secondary btn-sm"
+                style={{ textDecoration: 'none', justifyContent: 'center', fontSize: 12, padding: '8px 4px' }}
+              >
+                PhonePe
+              </a>
+              <a
+                href={paytmUri}
+                onClick={beginUpiHandoff}
+                className="btn btn-secondary btn-sm"
+                style={{ textDecoration: 'none', justifyContent: 'center', fontSize: 12, padding: '8px 4px' }}
+              >
+                Paytm
+              </a>
+            </div>
+
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => copyValue(receiverUpiId ?? '', 'UPI ID')}><Copy size={14} aria-hidden="true" /> Copy UPI ID</button>
               <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => copyValue(amount, 'Amount')}><Copy size={14} aria-hidden="true" /> Copy Amount</button>
             </div>
             {copied && <p role="status" aria-live="polite" style={{ fontSize: 12, color: 'var(--color-medium)', marginTop: 8 }}>{copied}</p>}
           </div>
+
           <UpiHandoffPrompt
             state={upiHandoffState}
             onShowPrompt={showUpiReturnPrompt}
             onComplete={confirmUpiCompletion}
             onCancel={cancelUpiCompletion}
           />
+
           <div style={{ display: 'flex', gap: 12 }}>
             <SecondaryButton type="button" fullWidth onClick={backToInput}>Back</SecondaryButton>
-            {upiHandoffState === 'completed' && (
-              <PrimaryButton type="button" fullWidth onClick={() => setStep('review')}>Review Claim</PrimaryButton>
-            )}
+            <PrimaryButton
+              type="button"
+              fullWidth
+              onClick={() => {
+                setAcknowledged(true);
+                setStep('review');
+              }}
+            >
+              Review Claim
+            </PrimaryButton>
           </div>
         </>
       )}
@@ -354,10 +421,17 @@ function SettleUpFlow(options: {
             <p style={{ fontSize: 14, color: 'var(--color-dark)', lineHeight: 1.5 }}>{receiver.fullName} will receive a request to confirm or reject this payment.</p>
             {(reference.trim() || correlationRef) && <p style={{ fontSize: 12, color: 'var(--color-medium)', marginTop: 12, wordBreak: 'break-all' }}>Reference: {reference.trim() || correlationRef}</p>}
           </div>
-          {!receiverUpiId && <PaymentAcknowledgement checked={acknowledged} onChange={(checked) => { setAcknowledged(checked); setErrors((current) => ({ ...current, acknowledgement: undefined })); }} error={errors.acknowledgement} />}
+          <PaymentAcknowledgement
+            checked={acknowledged}
+            onChange={(checked) => {
+              setAcknowledged(checked);
+              setErrors((current) => ({ ...current, acknowledgement: undefined }));
+            }}
+            error={errors.acknowledgement}
+          />
           <div style={{ display: 'flex', gap: 12 }}>
             <SecondaryButton type="button" fullWidth onClick={() => setStep(receiverUpiId ? 'payment' : 'input')}>Back</SecondaryButton>
-            <PrimaryButton type="button" fullWidth loading={createSettlement.isPending} disabled={!acknowledged} onClick={submitClaim}>Submit Claim</PrimaryButton>
+            <PrimaryButton type="button" fullWidth loading={createSettlement.isPending} onClick={submitClaim}>Submit Claim</PrimaryButton>
           </div>
         </>
       )}
