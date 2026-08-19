@@ -63,8 +63,9 @@ self.addEventListener('push', (event) => {
       body: payload.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',
+      vibrate: [200, 100, 200],
       tag: payload.notificationId ? `expenso-${payload.notificationId}` : undefined,
-      renotify: false,
+      renotify: true,
       data: { href: payload.href, notificationId: payload.notificationId },
     });
   })());

@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/api/queries';
-import { isPushRefreshMessage } from './browser';
+import { isPushRefreshMessage, readyPushRegistration } from './browser';
 
 export const PUSH_REFRESH_QUERY_PREFIXES = [
   queryKeys.notifications,
@@ -34,6 +34,11 @@ export async function invalidatePushQueries(queryClient: Pick<ReturnType<typeof 
 
 export function PushRefreshBridge() {
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    void readyPushRegistration().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;

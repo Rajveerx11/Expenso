@@ -167,14 +167,26 @@ export function buildUPIUri(params: {
   receiverUpiId: string;
   receiverName: string;
   amount: string;
-  groupName: string;
-  correlationRef: string;
+  groupName?: string;
+  correlationRef?: string;
 }): string {
-  const { receiverUpiId, receiverName, amount, groupName, correlationRef } = params;
-  const tn = encodeURIComponent(`Expenso settlement for ${groupName}`);
-  const pn = encodeURIComponent(receiverName);
-  const tr = encodeURIComponent(correlationRef);
-  return `upi://pay?pa=${receiverUpiId}&pn=${pn}&am=${amount}&cu=INR&tr=${tr}&tn=${tn}`;
+  const { receiverUpiId, receiverName, amount, groupName } = params;
+  const numAmount = parseFloat(amount);
+  const formattedAmount = isNaN(numAmount) || numAmount <= 0 ? amount.trim() : numAmount.toFixed(2);
+  const cleanNote = groupName?.trim()
+    ? `Expenso settlement for ${groupName.trim().slice(0, 40)}`
+    : 'Expenso settlement';
+  const cleanName = receiverName.trim();
+  const cleanUpi = receiverUpiId.trim();
+
+  const query = new URLSearchParams();
+  query.set('pa', cleanUpi);
+  query.set('pn', cleanName);
+  query.set('am', formattedAmount);
+  query.set('cu', 'INR');
+  query.set('tn', cleanNote);
+
+  return `upi://pay?${query.toString()}`;
 }
 
 // ─── Split Calculation ───────────────────────────────────────
