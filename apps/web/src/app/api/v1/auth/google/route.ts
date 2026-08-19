@@ -1,8 +1,7 @@
 import { oauthSchema } from '@/shared/api/contracts';
 import { mapAuthError } from '@/server/http/errors';
 import { handleRouteError, ok, parseJson, requestIdFor } from '@/server/http/response';
-import { assertMutationRequest, safeRelativePath } from '@/server/http/security';
-import { getRuntimeConfig } from '@/server/config/env';
+import { assertMutationRequest, getRequestOrigin, safeRelativePath } from '@/server/http/security';
 import { createClient } from '@/server/supabase/server';
 import { enforceAuthRateLimit } from '@/server/auth/rate-limit';
 
@@ -14,8 +13,8 @@ export async function POST(request: Request) {
     assertMutationRequest(request);
     const input = await parseJson(request, oauthSchema);
     const next = safeRelativePath(input.next ?? null);
-    const { siteUrl } = getRuntimeConfig();
-    const redirectTo = new URL('/auth/callback', siteUrl);
+    const origin = getRequestOrigin(request);
+    const redirectTo = new URL('/auth/callback', origin);
     redirectTo.searchParams.set('next', next);
 
     const client = await createClient();

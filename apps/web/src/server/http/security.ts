@@ -91,3 +91,26 @@ export function safeRelativePath(value: string | null, fallback = '/dashboard'):
     return fallback;
   }
 }
+
+export function getRequestOrigin(request: Request): string {
+  const origin = request.headers.get('origin');
+  if (origin && getAllowedOrigins().has(origin)) {
+    return origin;
+  }
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const hostHeader = forwardedHost ?? request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto')
+    ?? (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  if (hostHeader && !/[\s,/@]/.test(hostHeader)) {
+    const candidate = `${proto}://${hostHeader.trim()}`;
+    try {
+      const url = new URL(candidate);
+      if (getAllowedOrigins().has(url.origin)) {
+        return url.origin;
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return getRuntimeConfig().siteUrl;
+}

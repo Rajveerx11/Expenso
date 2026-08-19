@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppError } from './errors';
-import { assertMutationRequest, contentSecurityPolicy, safeRelativePath } from './security';
+import { assertMutationRequest, contentSecurityPolicy, getRequestOrigin, safeRelativePath } from './security';
 
 const originalEnv = { ...process.env };
 
@@ -90,6 +90,26 @@ describe('safe redirects', () => {
     expect(safeRelativePath('/\t/evil.example')).toBe('/dashboard');
     expect(safeRelativePath('/%0D/evil.example')).toBe('/dashboard');
     expect(safeRelativePath('https://evil.example')).toBe('/dashboard');
+  });
+
+  it('determines the public request origin matching allowed origins or falls back to configured siteUrl', () => {
+    const originReq = new Request('https://expenso.example/api/v1/auth/signup', {
+      headers: { origin: 'https://preview.expenso.example' },
+    });
+    expect(getRequestOrigin(originReq)).toBe('https://preview.expenso.example');
+
+    const hostReq = new Request('http://localhost:3000/auth/callback', {
+      headers: {
+        'x-forwarded-host': 'preview.expenso.example',
+        'x-forwarded-proto': 'https',
+      },
+    });
+    expect(getRequestOrigin(hostReq)).toBe('https://preview.expenso.example');
+
+    const unknownReq = new Request('https://expenso.example/api/v1/auth/signup', {
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(getRequestOrigin(unknownReq)).toBe('https://expenso.example');
   });
 });
 
