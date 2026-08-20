@@ -29,7 +29,7 @@ describe('browser API client', () => {
   });
 
   it('preserves stable backend error details', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(409, {
       error: {
         code: 'SETTLEMENT_CHANGED', message: 'Balance changed.', requestId: 'request-3',
@@ -43,7 +43,7 @@ describe('browser API client', () => {
     )).rejects.toMatchObject({
       code: 'SETTLEMENT_CHANGED', status: 409, requestId: 'request-3', fieldErrors: { amount: ['Too high.'] },
     });
-    expect(consoleError).toHaveBeenCalledWith('[Expenso API request failed]', {
+    expect(consoleWarn).toHaveBeenCalledWith('[Expenso API request failed]', {
       method: 'GET',
       path: '/api/v1/groups/:id/settlements/:id',
       status: 409,
@@ -54,13 +54,13 @@ describe('browser API client', () => {
   });
 
   it('converts network failures into visible, retryable diagnostics', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('offline'));
 
     await expect(api.groups.get('00000000-0000-4000-8000-000000000001')).rejects.toMatchObject({
       code: 'DEPENDENCY_UNAVAILABLE', status: 0, retryable: true,
     });
-    expect(consoleError).toHaveBeenCalledWith('[Expenso API request failed]', expect.objectContaining({
+    expect(consoleWarn).toHaveBeenCalledWith('[Expenso API request failed]', expect.objectContaining({
       method: 'GET', path: '/api/v1/groups/:id', status: 0, code: 'DEPENDENCY_UNAVAILABLE',
     }));
   });

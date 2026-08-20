@@ -22,6 +22,10 @@ function isMissingRateLimitRpc(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
 }
 
+function isRateLimitRpcConfigurationError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === '42501';
+}
+
 function enforceLocalAuthRateLimit(action: AuthRateLimitAction, keyHash: string, now = Date.now()): void {
   const { hitLimit, windowMs } = RATE_LIMITS[action];
   const key = `${action}:${keyHash}`;
@@ -80,6 +84,18 @@ export async function enforceAuthRateLimit(
     secret_param: getRateLimitSecret(),
   });
   if (error) {
+    if (isRateLimitRpcConfigurationError(error)) {
+      // A stale or missing Vault value must not take all authentication offline.
+      // Supabase Auth still applies its provider limits; this bounded fallback adds
+      // per-process protection until RATE_LIMIT_SECRET and Vault are synchronized.
+      console.error(JSON.stringify({
+        level: 'error',
+        code: 'AUTH_RATE_LIMIT_CONFIGURATION_MISMATCH',
+        action,
+      }));
+      enforceLocalAuthRateLimit(action, keyHash);
+      return;
+    }
     if (process.env.NODE_ENV !== 'production' && isMissingRateLimitRpc(error)) {
       enforceLocalAuthRateLimit(action, keyHash);
       return;

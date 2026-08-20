@@ -60,7 +60,7 @@ The public RPC remains callable by pre-auth routes, but rejects callers without 
 
 The final privilege-hardening migration also removes legacy direct `anon` grants that older Supabase projects may apply to new public objects. Only the constant readiness probe and secret-protected auth rate limiter remain callable before sign-in.
 
-Local development falls back to a bounded process-local throttle only when PostgREST reports that `check_auth_rate_limit` is absent. This keeps login usable while initially configuring a project. Production remains fail-closed, so apply the migration and create the matching Vault secret before deployment.
+Local development falls back to a bounded process-local throttle when PostgREST reports that `check_auth_rate_limit` is absent. A missing or mismatched Vault authorization secret also uses that bounded fallback, in every environment, so configuration drift cannot take signup and login offline; Supabase Auth still applies its provider throttles and the server emits `AUTH_RATE_LIMIT_CONFIGURATION_MISMATCH`. Synchronize the Vault value with `RATE_LIMIT_SECRET` promptly because process-local limits are not durable across production instances. A missing RPC still fails closed in production, so apply the migration before deployment.
 
 ## Authentication flow
 

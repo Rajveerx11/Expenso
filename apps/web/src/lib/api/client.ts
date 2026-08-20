@@ -186,7 +186,10 @@ function reportApiFailure(method: string, path: string, error: ApiClientError): 
   const safePath = path
     .split('?', 1)[0]
     .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ':id');
-  console.error('[Expenso API request failed]', {
+  // Requests already surface a typed error in the UI, and 5xx responses are
+  // logged server-side with the same request ID. console.error makes Next.js
+  // dev mode show a false runtime-error overlay for handled API responses.
+  console.warn('[Expenso API request failed]', {
     method,
     path: safePath,
     status: error.status,

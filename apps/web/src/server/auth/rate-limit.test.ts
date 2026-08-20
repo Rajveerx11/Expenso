@@ -48,20 +48,23 @@ describe('auth rate limiting', () => {
     });
   });
 
-  it('maps a missing or mismatched Vault secret to dependency unavailable', async () => {
+  it('keeps auth available with a bounded fallback when the Vault secret is mismatched', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const client = {
       rpc: async () => ({ data: null, error: { code: '42501', message: 'Rate limit authorization failed' } }),
     } as unknown as SupabaseClient;
-    await expect(enforceAuthRateLimit(
-      client,
-      'signup',
-      'demo@example.com',
-      new Request('https://expenso.example/api/v1/auth/signup'),
-    )).rejects.toMatchObject({
-      code: 'DEPENDENCY_UNAVAILABLE',
-      status: 503,
-      retryable: true,
+    const request = new Request('https://expenso.example/api/v1/auth/signup', {
+      headers: { 'x-vercel-forwarded-for': '203.0.113.12' },
+    });
+    const identity = `mismatched-vault-${crypto.randomUUID()}@example.com`;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(enforceAuthRateLimit(client, 'signup', identity, request)).resolves.toBeUndefined();
+    }
+    await expect(enforceAuthRateLimit(client, 'signup', identity, request)).rejects.toMatchObject({
+      code: 'RATE_LIMITED', status: 429, retryable: true, retryAfterSeconds: 3600,
     } satisfies Partial<AppError>);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('AUTH_RATE_LIMIT_CONFIGURATION_MISMATCH'));
   });
 
   it('uses a bounded local throttle when the RPC is absent outside production', async () => {
