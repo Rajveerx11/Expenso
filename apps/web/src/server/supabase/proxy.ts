@@ -14,10 +14,8 @@ const PROTECTED_PREFIXES = ['/dashboard', '/expenses', '/groups', '/notification
 const AUTH_PAGES = ['/login', '/signup'];
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
-  const nonce = crypto.randomUUID().replaceAll('-', '');
-  const csp = contentSecurityPolicy(nonce);
+  const csp = contentSecurityPolicy();
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', csp);
   const existingCsrf = request.cookies.get(CSRF_COOKIE_NAME)?.value;
   const issuedCsrf = existingCsrf ? null : createCsrfToken();

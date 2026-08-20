@@ -158,7 +158,7 @@ function TransactionDetail({
           ) : (
             <form ref={formRef} onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <FormField label="Type" error={typeError} required>
-                <div role="group" aria-invalid={Boolean(typeError)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div role="group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {(['expense', 'income'] as const).map((value) => (
                     <button key={value} type="button" className={type === value ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => { setType(value); setFieldErrors((current) => ({ ...current, type: [] })); }} aria-pressed={type === value}>
                       {value === 'income' ? 'Income' : 'Expense'}
@@ -168,7 +168,7 @@ function TransactionDetail({
               </FormField>
               <FormField label="Amount" error={amountError} required><Input type="number" min="0.01" step="0.01" value={amount} onChange={(event) => { setAmount(event.target.value); setFieldErrors((current) => ({ ...current, amount: [] })); }} error={Boolean(amountError)} required /></FormField>
               <FormField label="Title" error={titleError} required><Input value={title} onChange={(event) => { setTitle(event.target.value); setFieldErrors((current) => ({ ...current, title: [] })); }} error={Boolean(titleError)} maxLength={120} required /></FormField>
-              <FormField label="Category" error={categoryError}><div role="group" aria-invalid={Boolean(categoryError)}><CategoryPicker selected={category} onChange={(value) => { setCategory(value); setFieldErrors((current) => ({ ...current, category: [] })); }} expenseOnly={type === 'expense'} /></div></FormField>
+              <FormField label="Category" error={categoryError}><div role="group"><CategoryPicker selected={category} onChange={(value) => { setCategory(value); setFieldErrors((current) => ({ ...current, category: [] })); }} expenseOnly={type === 'expense'} /></div></FormField>
               <FormField label="Date" error={dateError} required><Input type="date" value={expenseDate} onChange={(event) => { setExpenseDate(event.target.value); setFieldErrors((current) => ({ ...current, expenseDate: [], date: [] })); }} error={Boolean(dateError)} required /></FormField>
               <FormField label="Note" error={noteError}><Textarea value={note} onChange={(event) => { setNote(event.target.value); setFieldErrors((current) => ({ ...current, note: [] })); }} error={Boolean(noteError)} maxLength={500} /></FormField>
               {error && <p role="alert" style={{ color: 'var(--color-red)', fontSize: 13 }}>{error}</p>}

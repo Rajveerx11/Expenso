@@ -40,23 +40,6 @@ async function expectNoSeriousAxeViolations(page: Page) {
   expect(result.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([]);
 }
 
-async function simulateUpiAppReturn(page: Page) {
-  await page.getByRole('link', { name: 'Open UPI App' }).evaluate((element) => {
-    element.addEventListener('click', (event) => event.preventDefault(), { once: true });
-    (element as HTMLElement).click();
-  });
-  await expect(page.getByText('Complete payment in your UPI app')).toBeVisible();
-  await page.evaluate(() => {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-    window.dispatchEvent(new Event('blur'));
-    document.dispatchEvent(new Event('visibilitychange'));
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-    document.dispatchEvent(new Event('visibilitychange'));
-    window.dispatchEvent(new Event('focus'));
-  });
-  await expect(page.getByRole('heading', { name: 'Did you complete this payment?' })).toBeVisible();
-}
-
 async function addGroupExpense(page: Page, groupUrl: string, input: {
   title: string;
   amount: string;
@@ -356,32 +339,29 @@ test('complete two-user finance, group, settlement, inbox, upload, authorization
     await expect(bobPage.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
     await expect(bobPage.getByText('Outstanding balance')).toBeVisible();
     await bobPage.getByLabel('Amount to Pay').fill('99999.00');
-    await bobPage.getByRole('button', { name: 'Payment Options' }).click();
+    await bobPage.getByRole('button', { name: 'Continue to Payment' }).click();
     const settlementAmount = bobPage.getByLabel('Amount to Pay');
     const errorDescriptionId = await settlementAmount.getAttribute('aria-describedby');
     expect(errorDescriptionId).toBe('settlement-amount-error');
     await expect(bobPage.locator(`#${errorDescriptionId}`)).toContainText('cannot exceed');
     await bobPage.getByLabel('Amount to Pay').fill('40.00');
     await bobPage.getByLabel('Transaction reference').fill('E2E-UPI-REF-001');
-    await bobPage.getByRole('button', { name: 'Payment Options' }).click();
-    await expect(bobPage.locator('canvas[aria-label^="UPI QR code"]')).toBeVisible();
-    await screenshot(bobPage, '06-real-upi-qr-mobile.png');
+    await bobPage.getByRole('button', { name: 'Continue to Payment' }).click();
+    await expect(bobPage.getByRole('heading', { name: /Pay ₹40\.00 in your UPI app/ })).toBeVisible();
+    await expect(bobPage.getByText('alice@upi', { exact: true }).last()).toBeVisible();
+    await screenshot(bobPage, '06-upi-payment-details-mobile.png');
     let settlementCreateRequests = 0;
     bobPage.on('request', (request) => {
       if (request.method() === 'POST' && new URL(request.url()).pathname === `/api/v1/groups/${groupId}/settlements`) {
         settlementCreateRequests += 1;
       }
     });
-    await simulateUpiAppReturn(bobPage);
+    await bobPage.getByRole('button', { name: 'Failed or cancelled' }).click();
+    await expect(bobPage.getByText('Outstanding balance')).toBeVisible();
     expect(settlementCreateRequests).toBe(0);
-    await bobPage.getByRole('button', { name: 'Not yet' }).click();
+    await bobPage.getByRole('button', { name: 'Continue to Payment' }).click();
     expect(settlementCreateRequests).toBe(0);
-    await simulateUpiAppReturn(bobPage);
-    await bobPage.getByRole('button', { name: 'Yes, payment completed' }).click();
-    expect(settlementCreateRequests).toBe(0);
-    await bobPage.getByRole('button', { name: 'Review Claim' }).click();
-    expect(settlementCreateRequests).toBe(0);
-    await bobPage.getByRole('button', { name: 'Submit Claim' }).click();
+    await bobPage.getByRole('button', { name: 'Yes, I paid' }).click();
     await expect(bobPage.getByRole('heading', { name: 'Payment claim submitted' })).toBeVisible();
     expect(settlementCreateRequests).toBe(1);
     const firstClaimHref = await bobPage.getByRole('link', { name: 'View Claim' }).getAttribute('href');
@@ -418,13 +398,9 @@ test('complete two-user finance, group, settlement, inbox, upload, authorization
     await bobPage.getByRole('link', { name: /Settle Up/ }).click();
     await bobPage.getByLabel('Amount to Pay').fill('10.00');
     await bobPage.getByLabel('Transaction reference').fill('E2E-REJECT-001');
-    await bobPage.getByRole('button', { name: 'Payment Options' }).click();
-    await bobPage.getByRole('button', { name: 'I paid using the QR' }).click();
+    await bobPage.getByRole('button', { name: 'Continue to Payment' }).click();
     expect(settlementCreateRequests).toBe(1);
-    await bobPage.getByRole('button', { name: 'Yes, payment completed' }).click();
-    await bobPage.getByRole('button', { name: 'Review Claim' }).click();
-    expect(settlementCreateRequests).toBe(1);
-    await bobPage.getByRole('button', { name: 'Submit Claim' }).click();
+    await bobPage.getByRole('button', { name: 'Yes, I paid' }).click();
     await expect(bobPage.getByRole('heading', { name: 'Payment claim submitted' })).toBeVisible();
     expect(settlementCreateRequests).toBe(2);
     const rejectedClaimHref = await bobPage.getByRole('link', { name: 'View Claim' }).getAttribute('href');

@@ -7,7 +7,7 @@ import { AppError } from '@/server/http/errors';
 export const CSRF_COOKIE_NAME = 'expenso.csrf';
 export const CSRF_HEADER_NAME = 'x-csrf-token';
 
-export function contentSecurityPolicy(_nonce?: string): string {
+export function contentSecurityPolicy(): string {
   const supabaseOrigin = getRuntimeConfig().supabaseUrl;
   const supabaseWebSocketOrigin = supabaseOrigin.replace(/^http/, 'ws');
   return [
