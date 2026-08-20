@@ -7,16 +7,18 @@ export function UpiHandoffPrompt({
   onShowPrompt,
   onComplete,
   onCancel,
+  submitting = false,
 }: {
   state: UpiHandoffState;
   onShowPrompt: () => void;
   onComplete: () => void;
   onCancel: () => void;
+  submitting?: boolean;
 }) {
   if (state === 'idle') {
     return (
       <SecondaryButton type="button" fullWidth onClick={onShowPrompt}>
-        I paid using the QR
+        I already paid manually
       </SecondaryButton>
     );
   }
@@ -41,11 +43,11 @@ export function UpiHandoffPrompt({
       <section className="card" aria-labelledby="upi-return-question" style={{ padding: 16, display: 'grid', gap: 12, borderColor: 'var(--color-primary-medium)' }}>
         <div>
           <h3 id="upi-return-question" style={{ fontSize: 16, fontWeight: 750, color: 'var(--color-black)' }}>Did you complete this payment?</h3>
-          <p style={{ marginTop: 5, fontSize: 12, lineHeight: 1.5, color: 'var(--color-medium)' }}>Expenso cannot verify your UPI app result. Choose Yes only after the app shows success. If no app opened or you cancelled, choose Not yet.</p>
+          <p style={{ marginTop: 5, fontSize: 12, lineHeight: 1.5, color: 'var(--color-medium)' }}>Expenso cannot verify your UPI app result. Confirm only after the payment app shows success. This will send a pending claim to the receiver.</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <SecondaryButton type="button" onClick={onCancel}>Not yet</SecondaryButton>
-          <PrimaryButton type="button" onClick={onComplete}>Yes, payment completed</PrimaryButton>
+          <SecondaryButton type="button" onClick={onCancel} disabled={submitting}>Failed or cancelled</SecondaryButton>
+          <PrimaryButton type="button" onClick={onComplete} loading={submitting}>Yes, I paid</PrimaryButton>
         </div>
       </section>
     );
@@ -55,8 +57,8 @@ export function UpiHandoffPrompt({
     <div role="status" className="card" style={{ padding: 14, display: 'flex', alignItems: 'flex-start', gap: 10, background: 'var(--color-green-soft)', borderColor: 'var(--color-green)' }}>
       <CheckCircle size={19} aria-hidden="true" style={{ color: 'var(--color-green)', flexShrink: 0 }} />
       <div>
-        <strong style={{ display: 'block', fontSize: 14, color: 'var(--color-dark)' }}>Payment marked as completed</strong>
-        <span style={{ display: 'block', marginTop: 3, fontSize: 12, lineHeight: 1.45, color: 'var(--color-medium)' }}>Review the claim before submitting it to the receiver. Their confirmation is still required.</span>
+        <strong style={{ display: 'block', fontSize: 14, color: 'var(--color-dark)' }}>Creating pending claim…</strong>
+        <span style={{ display: 'block', marginTop: 3, fontSize: 12, lineHeight: 1.45, color: 'var(--color-medium)' }}>The receiver must confirm it before balances change.</span>
       </div>
     </div>
   );

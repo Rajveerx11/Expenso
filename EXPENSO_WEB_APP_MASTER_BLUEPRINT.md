@@ -44,7 +44,7 @@ When this blueprint conflicts with an old markdown file, prefer this blueprint. 
 
 ### 1.1 Product statement
 
-Expenso is a responsive personal and shared expense web application. Users record personal income and spending, create groups, split shared expenses, see pairwise debts, initiate UPI payments from supported devices or QR codes, and settle balances through two-party confirmation.
+Expenso is a responsive personal and shared expense web application. Users record personal income and spending, create groups, split shared expenses, see pairwise debts, initiate UPI payments from supported devices, and settle balances through two-party confirmation.
 
 ### 1.2 Product promise
 
@@ -106,7 +106,7 @@ These rules are more important than any individual screen design.
 10. At most one pending settlement may exist for the same group, payer, and receiver.
 11. Only the receiver may confirm or reject a pending settlement.
 12. Settlement confirmation is serialized, idempotent, and allocated oldest-first to outstanding splits.
-13. A UPI URI launch, browser return, or QR scan never proves payment. Receiver confirmation remains required.
+13. A UPI URI launch or browser return never proves payment. Receiver confirmation remains required.
 14. Personal spending analytics count expense shares, not reimbursements. Settlements reduce group debt; they do not erase historical spending.
 15. User identity comes from the verified server-side Supabase session. Client-supplied user IDs never authorize an operation.
 16. Browser push delivery is secondary. Every notification must exist in the persistent inbox even when push is unsupported, denied, or fails.
@@ -135,7 +135,7 @@ These rules are more important than any individual screen design.
 | Notifications | Persistent inbox; Web Push API + service worker + VAPID where supported |
 | Images | Next.js Image for display; browser File API for selection; client compression before direct Storage upload |
 | Navigation links | Normal HTTPS URLs through Next.js `Link`/router |
-| UPI | User-gesture `upi://pay` launch on supported mobile browsers; QR/copy fallback on desktop |
+| UPI | User-gesture `upi://pay` launch on supported mobile browsers; copy/manual fallback |
 | Animation | CSS transitions; Motion only for interactions needing orchestration |
 | Blur/glass | CSS `backdrop-filter` with solid fallback |
 | Icons | Lucide React |
@@ -580,11 +580,11 @@ Show full amount, category, paid-by identity, date, note, split type, and each m
 1. Generate a client correlation/reference ID.
 2. Build encoded `upi://pay` URI with `pa`, `pn`, `am`, `cu=INR`, `tr`, and `tn`.
 3. On a mobile browser, launch the URI only from an explicit user click. Do not auto-launch on page load.
-4. On desktop or when protocol launch is unavailable, show a QR code generated from the exact same URI plus Copy UPI ID and Copy Amount actions.
+4. When protocol launch is unavailable or blocked, show Copy UPI ID and Copy Amount actions for manual payment inside the chosen app.
 5. When the page regains visibility/focus, show “Did you complete this payment?” Never infer payment success from the browser handoff.
 6. Only “Yes, I paid” creates a pending settlement request.
 
-**Fallback:** if the receiver has no UPI ID or the protocol is unsupported, allow the payer to use the QR/copy route or record an already-made cash/manual payment claim with explicit copy; receiver confirmation is still required.
+**Fallback:** if the receiver has no UPI ID or the protocol is unsupported, allow the payer to use the copy/manual route or record an already-made cash/manual payment claim with explicit copy; receiver confirmation is still required.
 
 ### 7.15 Settlement confirmation
 
@@ -1459,7 +1459,7 @@ URL-encode every value. Do not log full UPI ID at info level.
 ### 16.2 Browser integration
 
 - Invoke `upi://pay` from a real anchor/button click on compatible mobile browsers. Do not rely on browser user-agent detection as proof that an app exists.
-- Provide a QR code of the same URI for desktop and unsupported browsers, with copyable payee, amount, and reference.
+- Provide copyable payee, amount, and reference details for blocked or unsupported UPI handoffs.
 - Listen to `visibilitychange` and `focus` only to offer the manual completion question when the user returns; those events do not prove that payment occurred.
 - Gracefully handle blocked protocol navigation, no compatible app, cancellation, refresh, duplicate clicks, and browser history restoration.
 - Keep the settlement draft server-independent until the user explicitly submits the payment claim.
@@ -1848,7 +1848,7 @@ The cron route verifies `Authorization: Bearer ${CRON_SECRET}`, uses a database 
 6. Add exact and percentage expenses including rounding edge cases.
 7. Attempt invalid member removal and group deletion; verify targeted errors.
 8. Delete shared expense; verify every linked effect reverses.
-9. Launch UPI on a mobile-browser viewport or use desktop QR/manual fallback; create partial settlement; receiver confirms; verify remaining balance.
+9. Launch UPI on a mobile-browser viewport or use the copy/manual fallback; create partial settlement; receiver confirms; verify remaining balance.
 10. Receiver rejects settlement; verify unchanged balance and payer notification.
 11. Open each notification URL from a closed and existing browser tab; verify login return path and authorization.
 12. Replace/unsubscribe a Web Push subscription and sign out; the old endpoint no longer receives user notifications.
@@ -1862,7 +1862,7 @@ The cron route verifies `Authorization: Bearer ${CRON_SECRET}`, uses a database 
 - Vercel Preview tested in current Chromium, Firefox, and WebKit/Safari-compatible coverage at 360, 768, 1024, and 1440 CSS-pixel widths.
 - Keyboard-only, screen reader smoke, 200% zoom, automated accessibility, and reduced-motion checks pass.
 - Production build has no secret-bearing values in browser chunks or source maps.
-- Staging Web Push and UPI handoff are tested on at least one supported physical Android browser; QR fallback is tested on desktop. Unsupported browsers retain full inbox/manual behavior.
+- Staging Web Push and UPI handoff are tested on at least one supported physical Android browser; copy/manual fallback is tested on desktop. Unsupported browsers retain full inbox/manual behavior.
 
 ---
 
@@ -1936,7 +1936,7 @@ The cron route verifies `Authorization: Bearer ${CRON_SECRET}`, uses a database 
 
 ### Phase 5 — Settlements, UPI, and Web Push
 
-**Frontend:** mobile-browser UPI launch, desktop QR/copy fallback, claim, confirmation page, notification inbox/URLs, service worker and permission UX.
+**Frontend:** mobile-browser UPI launch, copy/manual fallback, claim, confirmation page, notification inbox/URLs, service worker and permission UX.
 
 **Backend:** settlement functions/routes, outbox delivery, Web Push subscription lifecycle, post-response/webhook send, cron retry.
 **Exit:** two user accounts complete partial confirm/reject flows across desktop and mobile browsers; inbox remains correct when push is denied.
@@ -2025,7 +2025,7 @@ Run relevant tests and report changed files, verification, and remaining risks.
 - Every screen's required payload and loading/error behavior.
 - Which actions must appear by role/state.
 - Exact list sorting/pagination.
-- Direct image upload, browser UPI/QR, notification URL, and Web Push constraints.
+- Direct image upload, browser UPI handoff, notification URL, and Web Push constraints.
 - Frontend builds from generated client and shared fixtures.
 - Route Handlers and pages deploy together; the public API contract stays at same-origin `/api/v1`.
 
@@ -2050,7 +2050,7 @@ Run relevant tests and report changed files, verification, and remaining risks.
 - [ ] Shared expense mutation is atomic and idempotent.
 - [ ] Expense delete reverses splits, mirrors, balances, and related view state.
 - [ ] Balance signs and copy are correct from each user's perspective.
-- [ ] UPI launch is encoded and handles blocked/no-app/cancel/refresh cases; desktop QR and copy fallback match the exact payment URI.
+- [ ] UPI launch is encoded and handles blocked/no-app/cancel/refresh cases; copy/manual fallback preserves the exact payee and amount.
 - [ ] Partial settlement cannot exceed latest debt.
 - [ ] Only receiver can confirm/reject.
 - [ ] Concurrent/duplicate confirmations are safe.

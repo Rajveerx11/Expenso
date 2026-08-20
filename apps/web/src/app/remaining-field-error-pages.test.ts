@@ -32,10 +32,11 @@ describe('remaining mutation field-error wiring', () => {
     expect(settlement).toContain("setStep('input')");
   });
 
-  it('does not claim a UPI payment merely because review was opened', () => {
+  it('creates a claim only after explicit UPI completion acknowledgement', () => {
     const settlement = source('src/app/(dashboard)/groups/[groupId]/settle/[receiverId]/page.tsx');
 
-    expect(settlement).toContain("onClick={() => setStep('review')}");
-    expect(settlement).not.toMatch(/setAcknowledged\(true\);\s*setStep\('review'\)/);
+    expect(settlement).toContain('async function confirmUpiCompletion()');
+    expect(settlement).toContain('await submitClaim(true)');
+    expect(settlement).toContain('must confirm receipt before balances change');
   });
 });

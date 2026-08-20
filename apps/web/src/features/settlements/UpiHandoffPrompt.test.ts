@@ -16,16 +16,15 @@ describe('UPI handoff prompt', () => {
 
     expect(launching).not.toContain('Did you complete this payment?');
     expect(returned).toContain('Did you complete this payment?');
-    expect(returned).toContain('Yes, payment completed');
-    expect(returned).toContain('Not yet');
+    expect(returned).toContain('Yes, I paid');
+    expect(returned).toContain('Failed or cancelled');
     expect(returned).toContain('cannot verify your UPI app result');
   });
 
-  it('keeps completed handoff distinct from submitted claim', () => {
+  it('shows that receiver confirmation is still required while creating the claim', () => {
     const completed = renderToStaticMarkup(createElement(UpiHandoffPrompt, { state: 'completed', ...handlers }));
 
-    expect(completed).toContain('Payment marked as completed');
-    expect(completed).toContain('Review the claim before submitting');
-    expect(completed).not.toContain('claim submitted');
+    expect(completed).toContain('Creating pending claim');
+    expect(completed).toContain('receiver must confirm');
   });
 });

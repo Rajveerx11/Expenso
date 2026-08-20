@@ -14,7 +14,7 @@ import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation 
 import type { GroupBalance, GroupMember, GroupSummary } from '@/lib/types';
 import { ApiClientError, api, createIdempotencyKey, fieldErrorFor, fieldErrorsFor, focusFirstInvalidField, messageForError } from '@/lib/api/client';
 import { queryKeys } from '@/lib/api/queries';
-import { buildUPIUri, createUPITransactionRef, formatMoney } from '@/lib/utils';
+import { buildUPIUri, createUPIPaymentNote, createUPITransactionRef, formatMoney } from '@/lib/utils';
 import {
   claimInput,
   conflictCopy,
@@ -27,7 +27,6 @@ import {
 } from '@/features/settlements/domain';
 import { useSettleUpData } from '@/features/settlements/hooks';
 import { UpiHandoffPrompt } from '@/features/settlements/UpiHandoffPrompt';
-import { UpiQrCode } from '@/features/settlements/UpiQrCode';
 
 type ClaimStep = 'input' | 'payment' | 'review';
 
@@ -92,6 +91,7 @@ function SettleUpFlow(options: {
     groupName: group.name,
     correlationRef,
   }) : '';
+  const paymentNote = createUPIPaymentNote(group.name);
 
   useEffect(() => {
     if (step !== 'payment') return;
@@ -120,12 +120,12 @@ function SettleUpFlow(options: {
     };
   }, [step]);
 
-  function validate(requireAcknowledgement = false) {
+  function validate(requireAcknowledgement = false, acknowledgementOverride = acknowledged) {
     const nextErrors = validateSettlementClaim({
       amount,
       maximumAmount,
       transactionRef: reference,
-      acknowledged,
+      acknowledged: acknowledgementOverride,
       requireAcknowledgement,
     });
     setErrors(nextErrors);
@@ -164,10 +164,12 @@ function SettleUpFlow(options: {
     setUpiHandoffState((current) => nextUpiHandoffState(current, 'show-prompt'));
   }
 
-  function confirmUpiCompletion() {
+  async function confirmUpiCompletion() {
     setAcknowledged(true);
     setErrors((current) => ({ ...current, acknowledgement: undefined }));
     setUpiHandoffState((current) => nextUpiHandoffState(current, 'complete'));
+    const submitted = await submitClaim(true);
+    if (!submitted) setUpiHandoffState('returned');
   }
 
   function cancelUpiCompletion() {
@@ -192,9 +194,9 @@ function SettleUpFlow(options: {
     }
   }
 
-  async function submitClaim() {
+  async function submitClaim(acknowledgementOverride = acknowledged): Promise<boolean> {
     setRequestError('');
-    if (!validate(true)) return;
+    if (!validate(true, acknowledgementOverride)) return false;
     const input = claimInput({
       receiverId: receiver.userId,
       amount,
@@ -215,6 +217,7 @@ function SettleUpFlow(options: {
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
       ]);
+      return true;
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 409) {
         await options.refetchLatest();
@@ -239,6 +242,7 @@ function SettleUpFlow(options: {
           focusFirstInvalidField(formRef.current);
         }
       }
+      return false;
     }
   }
 
@@ -308,7 +312,7 @@ function SettleUpFlow(options: {
             />
           </FormField>
           <PrimaryButton type="button" fullWidth size="lg" onClick={continueFromInput}>
-            {receiverUpiId ? <><ExternalLink size={18} aria-hidden="true" /> Payment Options</> : 'Review Payment Claim'}
+            {receiverUpiId ? <><ExternalLink size={18} aria-hidden="true" /> Choose UPI App</> : 'Review Payment Claim'}
           </PrimaryButton>
         </>
       )}
@@ -316,10 +320,21 @@ function SettleUpFlow(options: {
       {step === 'payment' && paymentUri && (
         <>
           <div className="card" style={{ padding: 20, textAlign: 'center' }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-black)' }}>Pay {formatMoney(amount)}</h2>
-            <p style={{ fontSize: 13, color: 'var(--color-medium)', margin: '6px 0 16px' }}>Scan with any UPI app or choose a payment option below.</p>
-            <div style={{ display: 'inline-grid', placeItems: 'center', background: 'white', border: '1px solid var(--color-light)', borderRadius: 16, padding: 12 }}>
-              <UpiQrCode value={paymentUri} label={`UPI QR code to pay ${formatMoney(amount)} to ${receiver.fullName}`} />
+            <h2 style={{ fontSize: 18, fontWeight: 750, color: 'var(--color-black)' }}>Pay {formatMoney(amount)} with UPI</h2>
+            <p style={{ fontSize: 13, color: 'var(--color-medium)', margin: '6px 0 16px' }}>Choose an installed UPI app. Expenso will prefill these details.</p>
+            <div style={{ display: 'grid', gap: 10, padding: 14, textAlign: 'left', borderRadius: 14, background: 'var(--color-primary-lightest)', border: '1px solid var(--color-primary-medium)' }}>
+              <div>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--color-medium)' }}>To</span>
+                <strong style={{ display: 'block', marginTop: 2, fontSize: 14, color: 'var(--color-dark)', wordBreak: 'break-word' }}>{receiver.fullName}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--color-medium)' }}>UPI ID</span>
+                <strong style={{ display: 'block', marginTop: 2, fontSize: 14, color: 'var(--color-dark)', wordBreak: 'break-all' }}>{receiverUpiId}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--color-medium)' }}>Payment note</span>
+                <strong style={{ display: 'block', marginTop: 2, fontSize: 14, color: 'var(--color-dark)', wordBreak: 'break-word' }}>{paymentNote}</strong>
+              </div>
             </div>
 
             <a
@@ -328,11 +343,11 @@ function SettleUpFlow(options: {
               className="btn btn-primary"
               style={{ display: 'flex', width: '100%', textDecoration: 'none', justifyContent: 'center', marginTop: 16 }}
             >
-              <ExternalLink size={18} aria-hidden="true" /> Open in UPI App
+              <ExternalLink size={18} aria-hidden="true" /> Choose UPI App
             </a>
 
             <p style={{ fontSize: 12, color: 'var(--color-medium)', lineHeight: 1.5, marginTop: 10 }}>
-              Your phone will show every installed app that accepts standard UPI payment links. If one blocks the link, copy the UPI ID and amount below and pay inside that app.
+              Your phone should show installed apps that accept standard UPI links. If an app blocks the request, copy the details below and pay manually inside that app.
             </p>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -345,20 +360,12 @@ function SettleUpFlow(options: {
           <UpiHandoffPrompt
             state={upiHandoffState}
             onShowPrompt={showUpiReturnPrompt}
-            onComplete={confirmUpiCompletion}
+            onComplete={() => void confirmUpiCompletion()}
             onCancel={cancelUpiCompletion}
+            submitting={createSettlement.isPending}
           />
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <SecondaryButton type="button" fullWidth onClick={backToInput}>Back</SecondaryButton>
-            <PrimaryButton
-              type="button"
-              fullWidth
-              onClick={() => setStep('review')}
-            >
-              Review Claim
-            </PrimaryButton>
-          </div>
+          <SecondaryButton type="button" fullWidth onClick={backToInput} disabled={createSettlement.isPending}>Back</SecondaryButton>
         </>
       )}
 
@@ -381,7 +388,7 @@ function SettleUpFlow(options: {
           />
           <div style={{ display: 'flex', gap: 12 }}>
             <SecondaryButton type="button" fullWidth onClick={() => setStep(receiverUpiId ? 'payment' : 'input')}>Back</SecondaryButton>
-            <PrimaryButton type="button" fullWidth loading={createSettlement.isPending} onClick={submitClaim}>Submit Claim</PrimaryButton>
+            <PrimaryButton type="button" fullWidth loading={createSettlement.isPending} onClick={() => void submitClaim()}>Submit Claim</PrimaryButton>
           </div>
         </>
       )}

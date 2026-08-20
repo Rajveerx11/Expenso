@@ -41,7 +41,7 @@ Normal browser product and authentication requests use relative `/api/...` paths
 - Supabase SSR and Supabase JavaScript libraries on the server boundary.
 - CSS design tokens and Tailwind CSS 4 tooling.
 - `next/font` for build-time bundled Inter assets; no runtime font CDN dependency.
-- `react-hook-form`, `decimal.js`, `date-fns`, `qrcode`, Lucide, and Framer Motion where appropriate.
+- `react-hook-form`, `decimal.js`, `date-fns`, Lucide, and Framer Motion where appropriate.
 - Vitest for unit and contract tests; Playwright plus Axe for browser, responsive, and accessibility tests.
 
 ## Source map
@@ -70,7 +70,7 @@ apps/web/
 |  |- notifications/                 Inbox UI and cache updates
 |  |- profile/                       Profile cache helpers
 |  |- push/                          Browser subscription and cache refresh
-|  |- settlements/                   Settlement hooks, QR, UI domain helpers
+|  |- settlements/                   Settlement hooks and UPI handoff helpers
 |  |- shared-expenses/               Split input/domain helpers
 |  `- uploads/                       Browser image normalization/compression
 |- src/lib/
@@ -110,7 +110,7 @@ docs/
 | Personal finance | `/expenses`, `/expenses/new`, `/expenses/[expenseId]` | Cursor pagination, filters, analytics, create, detail, update, delete, and linked-transaction protections. |
 | Groups | `/groups`, `/groups/new`, `/groups/[groupId]`, `/groups/[groupId]/settings` | Cursor pagination, creation, image upload, admin settings, member add/remove, safe deletion, and authorization states. |
 | Shared expenses | `/groups/[groupId]/expenses/new`, `/groups/[groupId]/expenses/[expenseId]` | Equal, exact, and percentage splits; server-authoritative rounding; detail; protected reversal/deletion. |
-| Settlements | `/groups/[groupId]/settle/[receiverId]`, `/groups/[groupId]/settlements/[settlementId]` | Current balance, UPI deep link and QR, explicit payment acknowledgement, idempotent claim, receiver confirm/reject, terminal status and conflict handling. |
+| Settlements | `/groups/[groupId]/settle/[receiverId]`, `/groups/[groupId]/settlements/[settlementId]` | Current balance, UPI app handoff with prefilled details, copy fallback, explicit payment acknowledgement, idempotent claim, receiver confirm/reject, terminal status and conflict handling. |
 | Notifications | `/notifications` | Persistent cursor-paged inbox, unread count, mark-one/read-all, linked navigation, Web Push controls. |
 | Profile | `/profile`, `/profile/edit` | Live financial summary, name/UPI update, normalized avatar upload, sidebar synchronization, logout. |
 
@@ -206,7 +206,7 @@ Browser calculations are previews only. The backend/database validates membershi
 
 ### Settlements
 
-The settle route loads the payer-relative outstanding balance and receiver payment destination. It creates a `upi://pay` option and real QR code, but never treats opening a payment app as proof of payment. The user must acknowledge payment, review the amount/reference, then submit an idempotent pending claim.
+The settle route loads the payer-relative outstanding balance and receiver payment destination. It creates a generic `upi://pay` handoff with a prefilled amount, payee, and note, plus copyable details when a UPI app blocks the request. Returning from a payment app never proves success: the payer must explicitly confirm completion, which submits an idempotent pending claim for receiver confirmation.
 
 The receiver alone sees confirm/reject actions. Confirmation rechecks the balance snapshot; stale or excessive claims return stable conflict codes. UI handles pending, confirmed, rejected, partial-balance, waiting, terminal, and retry/error states. Confirm/reject refreshes balances, settlements, group, dashboard, profile, personal ledger, and notifications.
 
@@ -265,7 +265,7 @@ CI builds with sentinel server secrets, then scans `.next/static` and `public` t
 - Pages, layouts, navigation, reusable UI, accessible interaction states.
 - `src/lib/api/client.ts` request wrappers and browser DTO consumption.
 - Query keys, cache writes/invalidation, pagination, stale-data presentation.
-- Form mapping, client previews, upload normalization, QR/deep-link presentation.
+- Form mapping, client previews, upload normalization, and UPI handoff presentation.
 - Manifest, service-worker browser behavior, push subscription controls.
 - Component/unit/browser/accessibility tests.
 

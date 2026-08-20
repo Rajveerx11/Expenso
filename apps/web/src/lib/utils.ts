@@ -163,6 +163,12 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 }
 
 // ─── UPI URI Builder ─────────────────────────────────────────
+export function createUPIPaymentNote(groupName?: string): string {
+  return groupName?.trim()
+    ? `Expenso settlement for ${groupName.trim().slice(0, 40)}`
+    : 'Expenso settlement';
+}
+
 export function buildUPIUri(params: {
   receiverUpiId: string;
   receiverName: string;
@@ -173,9 +179,7 @@ export function buildUPIUri(params: {
   const { receiverUpiId, receiverName, amount, groupName, correlationRef } = params;
   const numAmount = parseFloat(amount);
   const formattedAmount = isNaN(numAmount) || numAmount <= 0 ? amount.trim() : numAmount.toFixed(2);
-  const cleanNote = groupName?.trim()
-    ? `Expenso settlement for ${groupName.trim().slice(0, 40)}`
-    : 'Expenso settlement';
+  const cleanNote = createUPIPaymentNote(groupName);
   const cleanName = receiverName.trim();
   const cleanUpi = receiverUpiId.trim();
   const cleanReference = correlationRef.trim();

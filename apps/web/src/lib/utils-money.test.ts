@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildUPIUri, createUPITransactionRef, formatMoney } from './utils';
+import { buildUPIUri, createUPIPaymentNote, createUPITransactionRef, formatMoney } from './utils';
 
 describe('formatMoney compact output', () => {
   it.each([
@@ -18,6 +18,11 @@ describe('formatMoney compact output', () => {
 });
 
 describe('buildUPIUri', () => {
+  it('creates the same payment note shown in the Expenso review UI', () => {
+    expect(createUPIPaymentNote('  VIT Flatmates  ')).toBe('Expenso settlement for VIT Flatmates');
+    expect(createUPIPaymentNote()).toBe('Expenso settlement');
+  });
+
   it('generates an encoded UPI URI with a unique transaction reference', () => {
     const uri = buildUPIUri({
       receiverUpiId: 'yuvraj2107@ibl',
