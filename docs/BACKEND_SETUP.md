@@ -12,7 +12,7 @@ Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | browser-safe | Exact Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser-safe | Current publishable key from the Supabase project. |
-| `NEXT_PUBLIC_SITE_URL` | browser-safe | Canonical site origin used for OAuth redirects and same-origin checks. |
+| `NEXT_PUBLIC_SITE_URL` | browser-safe | Canonical site origin used for confirmation redirects and same-origin checks. |
 | `APP_ALLOWED_ORIGINS` | server only | Optional comma-separated preview origins. |
 | `RATE_LIMIT_SALT` | server only | Random 32+ character salt for irreversible auth-throttle fingerprints. |
 | `RATE_LIMIT_SECRET` | server only | Random 32+ character secret matching the Supabase Vault entry below. |
@@ -65,10 +65,10 @@ Local development falls back to a bounded process-local throttle only when Postg
 ## Authentication flow
 
 1. A page request receives a double-submit CSRF cookie and a per-request CSP nonce from Next.js Proxy.
-2. Signup/login/Google-start requests require exact allowed `Origin`, `Sec-Fetch-Site` when present, and the matching `x-csrf-token` header.
+2. Signup/login requests require exact allowed `Origin`, `Sec-Fetch-Site` when present, and the matching `x-csrf-token` header.
 3. Supabase SSR stores and refreshes the session in cookies.
 4. Protected pages and every protected route verify `getClaims()`; they never trust `getSession()` as identity.
-5. OAuth returns only through `/auth/callback`; the final destination must be a local relative path.
+5. Email confirmation returns only through `/auth/callback`; the final destination must be a local relative path.
 6. Authenticated responses are `private, no-store` and vary on `Cookie`.
 
 ## Foundation endpoints
@@ -80,9 +80,8 @@ Local development falls back to a bounded process-local throttle only when Postg
 | GET | `/api/v1/auth/csrf` | No | Obtain the current CSRF token. |
 | POST | `/api/v1/auth/signup` | No | Email/password registration. |
 | POST | `/api/v1/auth/login` | No | Email/password session creation. |
-| POST | `/api/v1/auth/google` | No | Obtain an allowlisted Google OAuth URL. |
 | POST | `/api/v1/auth/logout` | Yes | End the local session. |
-| GET | `/auth/callback` | OAuth code | Complete PKCE exchange. |
+| GET | `/auth/callback` | Confirmation code | Complete PKCE exchange. |
 | GET/PATCH | `/api/v1/me` | Yes | Read/update the session profile. |
 | POST | `/api/v1/me/avatar/upload-ticket` | Yes | Create a scoped direct-upload ticket. |
 | POST | `/api/v1/me/avatar/complete` | Yes | Verify and attach an uploaded avatar. |
@@ -114,7 +113,7 @@ Local development falls back to a bounded process-local throttle only when Postg
 
 Every JSON response uses the request-ID-bearing envelope defined in the master blueprint. English messages are for people; clients branch only on stable error codes.
 
-Signup, login, and Google-start routes use a durable Supabase-backed rate limiter keyed by an HMAC of the normalized identity and platform-provided client address. Raw email/IP values are not stored. Provider 429 and 5xx failures remain distinct stable API errors and expose `Retry-After` when the application limiter knows it.
+Signup and login routes use a durable Supabase-backed rate limiter keyed by an HMAC of the normalized identity and platform-provided client address. Raw email/IP values are not stored. Provider 429 and 5xx failures remain distinct stable API errors and expose `Retry-After` when the application limiter knows it.
 
 Personal transaction creation requires a 16–128 character `Idempotency-Key` header. The database computes the canonical request digest, serializes matching keys, stores the original response privately for 24 hours, replays identical requests, and rejects changed payloads. Create/update/delete and profile aggregate recalculation commit atomically. Group-linked ledger rows remain readable but cannot be edited or deleted through personal routes.
 

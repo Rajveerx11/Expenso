@@ -27,7 +27,6 @@ import { GET as readyGet } from './readyz/route';
 import { GET as csrfGet } from './v1/auth/csrf/route';
 import { POST as loginPost } from './v1/auth/login/route';
 import { POST as signupPost } from './v1/auth/signup/route';
-import { POST as googlePost } from './v1/auth/google/route';
 import { POST as logoutPost } from './v1/auth/logout/route';
 import { GET as meGet, PATCH as mePatch } from './v1/me/route';
 import { POST as avatarTicketPost } from './v1/me/avatar/upload-ticket/route';
@@ -156,22 +155,18 @@ describe('auth routes', () => {
     expect(await errorCode(response)).toBe('DEPENDENCY_UNAVAILABLE');
   });
 
-  it('creates signup and Google OAuth provider requests with allowlisted callback', async () => {
+  it('creates signup requests with an allowlisted confirmation callback', async () => {
     const signUp = vi.fn().mockResolvedValue({ data: { user: { id: userId }, session: null }, error: null });
-    const signInWithOAuth = vi.fn().mockResolvedValue({ data: { url: 'https://accounts.google.test/' }, error: null });
-    mocks.createClient.mockResolvedValue({ auth: { signUp, signInWithOAuth } });
+    mocks.createClient.mockResolvedValue({ auth: { signUp } });
     const signup = await signupPost(mutation('/api/v1/auth/signup', {
       fullName: 'Demo User', email: 'demo@example.com', password: 'correct-horse',
     }));
     expect(signup.status).toBe(201);
     expect(signUp.mock.calls[0][0].options.emailRedirectTo)
       .toBe('https://expenso.example/auth/callback?next=%2Fonboarding');
-    const oauth = await googlePost(mutation('/api/v1/auth/google', { next: '//evil.example' }));
-    expect(oauth.status).toBe(200);
-    expect(signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe('https://expenso.example/auth/callback?next=%2Fdashboard');
   });
 
-  it('maps signup and OAuth provider outages to retryable 503 errors', async () => {
+  it('maps signup provider outages to retryable 503 errors', async () => {
     mocks.createClient.mockResolvedValueOnce({
       auth: { signUp: vi.fn().mockResolvedValue({ data: { user: null }, error: { status: 503 } }) },
     });
@@ -180,13 +175,6 @@ describe('auth routes', () => {
     }));
     expect(signupResponse.status).toBe(503);
     expect(await errorCode(signupResponse)).toBe('DEPENDENCY_UNAVAILABLE');
-
-    mocks.createClient.mockResolvedValueOnce({
-      auth: { signInWithOAuth: vi.fn().mockResolvedValue({ data: { url: null }, error: { status: 503 } }) },
-    });
-    const oauthResponse = await googlePost(mutation('/api/v1/auth/google', {}));
-    expect(oauthResponse.status).toBe(503);
-    expect(await errorCode(oauthResponse)).toBe('DEPENDENCY_UNAVAILABLE');
   });
 
   it('requires verified claims for logout', async () => {
@@ -198,18 +186,18 @@ describe('auth routes', () => {
     expect((await logoutPost(mutation('/api/v1/auth/logout', {}))).status).toBe(200);
   });
 
-  it('completes OAuth only with an exchangeable code and safe next path', async () => {
+  it('completes account confirmation only with an exchangeable code and safe next path', async () => {
     const exchangeCodeForSession = vi.fn().mockResolvedValue({ error: null });
     mocks.createClient.mockResolvedValue({ auth: { exchangeCodeForSession } });
     const response = await callbackGet(new NextRequest('https://expenso.example/auth/callback?code=abc&next=%2Fprofile'));
     expect(response.headers.get('location')).toBe('https://expenso.example/profile');
     const failed = await callbackGet(new NextRequest('https://expenso.example/auth/callback?next=%2Fgroups%2F123'));
-    expect(failed.headers.get('location')).toBe('https://expenso.example/login?error=oauth_failed&next=%2Fgroups%2F123');
+    expect(failed.headers.get('location')).toBe('https://expenso.example/login?error=confirmation_failed&next=%2Fgroups%2F123');
     const hostile = await callbackGet(new NextRequest('https://expenso.example/auth/callback?next=//evil.example'));
-    expect(hostile.headers.get('location')).toBe('https://expenso.example/login?error=oauth_failed&next=%2Fdashboard');
+    expect(hostile.headers.get('location')).toBe('https://expenso.example/login?error=confirmation_failed&next=%2Fdashboard');
   });
 
-  it('routes new OAuth users through onboarding and returning users to safe next', async () => {
+  it('routes newly confirmed users through onboarding and returning users to safe next', async () => {
     const exchangeCodeForSession = vi.fn()
       .mockResolvedValueOnce({
         data: { user: { created_at: '2026-08-14T00:00:00.000Z', last_sign_in_at: '2026-08-14T00:00:01.000Z' } },

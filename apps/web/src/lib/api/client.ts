@@ -251,8 +251,6 @@ export const api = {
       apiRequest<{ userId: string }>('/api/v1/auth/login', { method: 'POST', json: input }).then((value) => value.data),
     signup: (input: { fullName: string; email: string; password: string }) =>
       apiRequest<{ userId: string; emailConfirmationRequired: boolean }>('/api/v1/auth/signup', { method: 'POST', json: input }).then((value) => value.data),
-    google: (next = '/dashboard') =>
-      apiRequest<{ url: string }>('/api/v1/auth/google', { method: 'POST', json: { next } }).then((value) => value.data),
     logout: async () => {
       const result = await apiRequest<{ signedOut: true }>('/api/v1/auth/logout', { method: 'POST' });
       clearPrivateClientState();

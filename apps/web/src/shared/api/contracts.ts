@@ -258,10 +258,6 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(128),
 }).strict();
 
-export const oauthSchema = z.object({
-  next: z.string().max(500).optional(),
-}).strict();
-
 export const avatarTicketSchema = z.object({
   contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   sizeBytes: z.number().int().positive().max(5 * 1024 * 1024),

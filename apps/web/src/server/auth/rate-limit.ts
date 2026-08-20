@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getRateLimitSalt, getRateLimitSecret } from '@/server/config/env';
 import { AppError } from '@/server/http/errors';
 
-export type AuthRateLimitAction = 'login' | 'signup' | 'google';
+export type AuthRateLimitAction = 'login' | 'signup';
 
 interface LocalRateLimitEntry {
   hitCount: number;
@@ -16,7 +16,6 @@ const LOCAL_RATE_LIMIT_MAX_KEYS = 10_000;
 const RATE_LIMITS: Record<AuthRateLimitAction, { hitLimit: number; windowMs: number }> = {
   login: { hitLimit: 10, windowMs: 15 * 60 * 1_000 },
   signup: { hitLimit: 5, windowMs: 60 * 60 * 1_000 },
-  google: { hitLimit: 20, windowMs: 15 * 60 * 1_000 },
 };
 
 function isMissingRateLimitRpc(error: unknown): boolean {

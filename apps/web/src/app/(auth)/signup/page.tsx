@@ -3,8 +3,8 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, Eye, EyeOff, Mail, Lock, User, Globe } from 'lucide-react';
-import { PrimaryButton, OutlineButton } from '@/components/ui/Buttons';
+import { CheckCircle, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { PrimaryButton } from '@/components/ui/Buttons';
 import { FormField, Input } from '@/components/ui/FormField';
 import { bestEffortDisableCurrentPush } from '@/features/push/cleanup';
 import { api, fieldErrorFor, fieldErrorsFor, focusFirstInvalidField, messageForError, type ApiFieldErrors } from '@/lib/api/client';
@@ -63,21 +63,6 @@ export default function SignupPage() {
       setFieldErrors(fieldErrorsFor(requestError));
       focusFirstInvalidField(formRef.current);
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGoogle() {
-    setError('');
-    setFieldErrors({});
-    setLoading(true);
-    try {
-      await bestEffortDisableCurrentPush();
-      const { url } = await api.auth.google('/onboarding');
-      queryClient.clear();
-      window.location.assign(url);
-    } catch (requestError) {
-      setError(messageForError(requestError));
       setLoading(false);
     }
   }
@@ -162,16 +147,6 @@ export default function SignupPage() {
           Create Account
         </PrimaryButton>
 
-        {/* Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--color-light)' }} />
-          <span style={{ fontSize: '12px', color: 'var(--color-medium)', fontWeight: 500 }}>OR</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--color-light)' }} />
-        </div>
-
-        <OutlineButton type="button" fullWidth loading={loading} icon={<Globe size={18} />} onClick={handleGoogle}>
-          Continue with Google
-        </OutlineButton>
       </form>
 
       {/* Footer */}

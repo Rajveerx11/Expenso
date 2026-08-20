@@ -27,7 +27,7 @@ describe('foundation OpenAPI contract', () => {
   });
 
   it('types every auth success envelope and every stable error code', () => {
-    for (const schema of ['SignUpResponse', 'LoginResponse', 'GoogleOAuthResponse', 'LogoutResponse']) {
+    for (const schema of ['SignUpResponse', 'LoginResponse', 'LogoutResponse']) {
       expect(spec).toContain(`schema: {$ref: '#/components/schemas/${schema}'}`);
     }
     expect(spec).toContain("code: {$ref: '#/components/schemas/ApiErrorCode'}");

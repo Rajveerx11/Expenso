@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
   }
   const loginUrl = new URL('/login', origin);
-  loginUrl.searchParams.set('error', 'oauth_failed');
+  loginUrl.searchParams.set('error', 'confirmation_failed');
   loginUrl.searchParams.set('next', next);
   return NextResponse.redirect(loginUrl);
 }

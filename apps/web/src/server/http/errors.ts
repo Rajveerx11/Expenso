@@ -51,7 +51,7 @@ export class AppError extends Error {
   }
 }
 
-export function mapAuthError(error: AuthError | null, context: 'login' | 'signup' | 'oauth'): AppError {
+export function mapAuthError(error: AuthError | null, context: 'login' | 'signup'): AppError {
   const status = error?.status ?? 0;
   if (status === 429) {
     return new AppError({ code: 'RATE_LIMITED', status: 429, retryable: true, cause: error });
@@ -62,16 +62,13 @@ export function mapAuthError(error: AuthError | null, context: 'login' | 'signup
   if (context === 'login') {
     return new AppError({ code: 'AUTH_REQUIRED', status: 401, message: 'Email or password is incorrect.', cause: error });
   }
-  if (context === 'signup') {
-    return new AppError({
-      code: 'VALIDATION_ERROR',
-      status: 422,
-      message: 'Unable to create this account.',
-      fieldErrors: { email: ['Unable to create this account.'] },
-      cause: error,
-    });
-  }
-  return new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true, cause: error });
+  return new AppError({
+    code: 'VALIDATION_ERROR',
+    status: 422,
+    message: 'Unable to create this account.',
+    fieldErrors: { email: ['Unable to create this account.'] },
+    cause: error,
+  });
 }
 
 export function validationError(error: z.ZodError): AppError {

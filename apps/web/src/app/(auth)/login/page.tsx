@@ -3,29 +3,29 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, EyeOff, Mail, Lock, Globe } from 'lucide-react';
-import { PrimaryButton, OutlineButton } from '@/components/ui/Buttons';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { PrimaryButton } from '@/components/ui/Buttons';
 import { FormField, Input } from '@/components/ui/FormField';
 import { bestEffortDisableCurrentPush } from '@/features/push/cleanup';
 import { api, messageForError, safeRelativePath } from '@/lib/api/client';
 
-const OAUTH_FAILURE_MESSAGE = 'Sign-in confirmation did not finish. Try again, or sign in with your email and password.';
+const CONFIRMATION_FAILURE_MESSAGE = 'Account confirmation did not finish. Try the confirmation link again, or sign in with your email and password.';
 
-export function oauthCallbackError(code: string | null): string {
-  return code === 'oauth_failed' ? OAUTH_FAILURE_MESSAGE : '';
+export function confirmationCallbackError(code: string | null): string {
+  return code === 'confirmation_failed' ? CONFIRMATION_FAILURE_MESSAGE : '';
 }
 
-export function oauthRetryPath(pathname: string, search: string, hash = ''): string {
+export function confirmationRetryPath(pathname: string, search: string, hash = ''): string {
   const params = new URLSearchParams(search);
   params.delete('error');
   const query = params.toString();
   return `${pathname}${query ? `?${query}` : ''}${hash}`;
 }
 
-export function OAuthFailureAlert() {
+export function ConfirmationFailureAlert() {
   return (
     <div role="alert" style={{ background: 'var(--color-red-soft)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: '10px', padding: '12px', fontSize: '14px', color: 'var(--color-red)', lineHeight: 1.5 }}>
-      {OAUTH_FAILURE_MESSAGE}
+      {CONFIRMATION_FAILURE_MESSAGE}
     </div>
   );
 }
@@ -39,17 +39,17 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [oauthFailureDismissed, setOauthFailureDismissed] = useState(false);
-  const oauthFailure = !oauthFailureDismissed && oauthCallbackError(searchParams.get('error'));
+  const [confirmationFailureDismissed, setConfirmationFailureDismissed] = useState(false);
+  const confirmationFailure = !confirmationFailureDismissed && confirmationCallbackError(searchParams.get('error'));
 
   function clearErrorsForRetry() {
     setError('');
-    setOauthFailureDismissed(true);
-    if (oauthFailure) {
+    setConfirmationFailureDismissed(true);
+    if (confirmationFailure) {
       window.history.replaceState(
         window.history.state,
         '',
-        oauthRetryPath(window.location.pathname, window.location.search, window.location.hash),
+        confirmationRetryPath(window.location.pathname, window.location.search, window.location.hash),
       );
     }
   }
@@ -68,21 +68,6 @@ function LoginForm() {
     } catch (requestError) {
       setError(messageForError(requestError));
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGoogle() {
-    clearErrorsForRetry();
-    setLoading(true);
-    try {
-      await bestEffortDisableCurrentPush();
-      const next = safeRelativePath(new URLSearchParams(window.location.search).get('next'));
-      const { url } = await api.auth.google(next);
-      queryClient.clear();
-      window.location.assign(url);
-    } catch (requestError) {
-      setError(messageForError(requestError));
       setLoading(false);
     }
   }
@@ -140,22 +125,12 @@ function LoginForm() {
             {error}
           </div>
         )}
-        {!error && oauthFailure && <OAuthFailureAlert />}
+        {!error && confirmationFailure && <ConfirmationFailureAlert />}
 
         <PrimaryButton type="submit" fullWidth size="lg" loading={loading} style={{ marginTop: '8px' }}>
           Sign In
         </PrimaryButton>
 
-        {/* Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--color-light)' }} />
-          <span style={{ fontSize: '12px', color: 'var(--color-medium)', fontWeight: 500 }}>OR</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--color-light)' }} />
-        </div>
-
-        <OutlineButton type="button" fullWidth loading={loading} icon={<Globe size={18} />} onClick={handleGoogle}>
-          Continue with Google
-        </OutlineButton>
       </form>
 
       {/* Footer */}

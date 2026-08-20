@@ -104,7 +104,7 @@ docs/
 
 | Area | Routes | Integrated behavior |
 |---|---|---|
-| Entry/auth | `/`, `/login`, `/signup`, `/auth/callback` | Email/password signup and login, Google OAuth start/callback, safe `next` return path, authenticated redirect, logout. |
+| Entry/auth | `/`, `/login`, `/signup`, `/auth/callback` | Email/password signup and login, email-confirmation callback, safe `next` return path, authenticated redirect, logout. |
 | Onboarding | `/onboarding` | Completes display name and optional UPI ID against the live profile API. |
 | Dashboard | `/dashboard` | Live month totals, net, group debts, unread count, and recent activity. |
 | Personal finance | `/expenses`, `/expenses/new`, `/expenses/[expenseId]` | Cursor pagination, filters, analytics, create, detail, update, delete, and linked-transaction protections. |
@@ -182,7 +182,7 @@ Private caches and CSRF memory are cleared on logout, expired session, and accou
 
 Next.js Proxy refreshes Supabase SSR cookies, protects dashboard prefixes, redirects authenticated users away from login/signup, issues CSRF state, and attaches a per-request CSP nonce. Server code uses `auth.getClaims()` as identity; it does not trust `getSession()`.
 
-Session cookies are forced `HttpOnly`, `SameSite=Lax`, scoped to `/`, and `Secure` in production. No browser Supabase client exists. Login, signup, Google start, OAuth callback, onboarding, logout, deep-link return, and protected-route redirect are connected.
+Session cookies are forced `HttpOnly`, `SameSite=Lax`, scoped to `/`, and `Secure` in production. No browser Supabase client exists. Login, signup, email confirmation, onboarding, logout, deep-link return, and protected-route redirect are connected.
 
 Avatar and group-image uploads are re-encoded and resized in the browser before upload, which also removes original file metadata. The backend controls MIME/size/path, issues a scoped signed ticket, and verifies the object during completion.
 

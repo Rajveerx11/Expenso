@@ -62,7 +62,7 @@ Expenso is a responsive personal and shared expense web application. Users recor
 
 - Responsive website for mobile, tablet, laptop, and desktop browsers.
 - One Next.js/Vercel application: frontend pages and Node.js API served from the same domain.
-- Email/password and Google authentication.
+- Email/password authentication.
 - Personal transaction CRUD and analytics.
 - Group creation, membership, shared expenses, and balances.
 - Equal, exact, and percentage splits.
@@ -335,7 +335,6 @@ Store relative paths in notification records and resolve them against `NEXT_PUBL
 - Email/password sign-in.
 - Email/password sign-up with full name.
 - Email-confirmation-required state when configured by Supabase.
-- Google sign-in.
 - Profile auto-creation from auth metadata.
 - First-use onboarding with display name and optional UPI ID.
 - Secure cookie-based session persistence and refresh.
@@ -440,11 +439,11 @@ Every data screen must implement loading, refreshing, empty, success, recoverabl
 
 ### 7.2 Login
 
-**Fields/actions:** email, password, show/hide password, Sign In, Google sign-in, link to Sign Up.
+**Fields/actions:** email, password, show/hide password, Sign In, link to Sign Up.
 
 **Validation:** both fields required; trim and lowercase email for transport; preserve password exactly.
 
-**States:** normal, submitting, Google account flow, error. Disable duplicate submission.
+**States:** normal, submitting, error. Disable duplicate submission.
 
 **Success:** route to Onboarding when profile is incomplete, otherwise Dashboard. Replace the login history entry so Back does not expose an authenticated login form.
 
@@ -1370,9 +1369,9 @@ The API must call safe functions. Do not reproduce legacy direct-delete/direct-m
 6. Server-rendered protected layouts check the session before returning private content; every API route independently checks it again.
 7. Failed refresh clears private query/cache state and redirects to Login with a safe return path. Never store access or refresh tokens in `localStorage`.
 
-### 14.2 Google sign-in
+### 14.2 Email confirmation
 
-Use Supabase OAuth with Google and the Next.js `/auth/callback` route. Configure the exact production origin, approved preview policy, and localhost callback in Supabase and Google Cloud. Generate the OAuth `redirectTo` value server-side from an allowlisted origin; never trust an arbitrary request host and never expose the Google client secret to browser code.
+Use the Next.js `/auth/callback` route for Supabase email confirmation. Configure the exact production origin, approved preview policy, and localhost callback in Supabase. Generate the confirmation `emailRedirectTo` value server-side from an allowlisted origin; never trust an arbitrary request host.
 
 ### 14.3 Authorization matrix
 
@@ -1673,7 +1672,7 @@ Redact authorization/cookie headers, passwords, session and CSRF tokens, UPI IDs
 - Supabase SSR auth cookies use `Secure` in production and an intentional `SameSite`/scope policy. They are not forced to `HttpOnly` because the supported browser client needs to maintain the session; compensate with strict XSS defenses and never expose them in logs.
 - Authenticated pages and any response that refreshes cookies are dynamic and private/no-store. Never cache `Set-Cookie` or user-specific HTML through ISR/CDN behavior.
 - State-changing routes reject cross-origin requests and invalid CSRF tokens.
-- A restrictive Content Security Policy, frame protection, MIME sniffing protection, Referrer Policy, and Permissions Policy are defined and tested without breaking Supabase/OAuth/Push requirements.
+- A restrictive Content Security Policy, frame protection, MIME sniffing protection, Referrer Policy, and Permissions Policy are defined and tested without breaking Supabase Auth or Web Push requirements.
 - User-controlled text renders as text, never unsafe HTML; URL and image sources are allowlisted.
 - RLS enabled on every exposed table.
 - Input length, enum, UUID, email, date, and decimal formats constrained at API and DB.
@@ -1718,14 +1717,14 @@ DATABASE_WEBHOOK_SECRET=
 IDEMPOTENCY_TTL_HOURS=
 ```
 
-Validate configuration when server modules initialize and fail with secret-safe messages. `NEXT_PUBLIC_SITE_URL` is the canonical origin used for OAuth redirects and notification links; preview origins must follow an explicit allowlist policy rather than trusting the Host header.
+Validate configuration when server modules initialize and fail with secret-safe messages. `NEXT_PUBLIC_SITE_URL` is the canonical origin used for confirmation redirects and notification links; preview origins must follow an explicit allowlist policy rather than trusting the Host header.
 
 ### 22.3 Environments
 
 - Local: local Supabase when feasible; fixtures for frontend.
-- Preview: Vercel preview deployment with nonproduction Supabase, preview OAuth policy, and safe fake/test financial data.
+- Preview: Vercel preview deployment with nonproduction Supabase, preview confirmation-redirect policy, and safe fake/test financial data.
 - Staging: stable alias/domain backed by isolated staging credentials when the team needs a persistent release-candidate URL.
-- Production: custom domain, isolated data, credentials, OAuth client, Web Push VAPID identity, API routes, and observability.
+- Production: custom domain, isolated data, credentials, Web Push VAPID identity, API routes, and observability.
 
 Never point local or preview deployments at production by default. Treat Vercel Preview and Production environment variables separately.
 
@@ -1779,7 +1778,7 @@ The cron route verifies `Authorization: Bearer ${CRON_SECRET}`, uses a database 
 1. Backward-compatible database migration.
 2. Deploy a Preview build and run database/API/browser integration tests.
 3. Deploy/promote the one Next.js project containing both frontend and backend.
-4. Verify canonical domain, OAuth callback, cookies, API, Storage upload, Realtime, Web Push, and cron/webhook authentication in production.
+4. Verify canonical domain, email-confirmation callback, cookies, API, Storage upload, Realtime, Web Push, and cron/webhook authentication in production.
 5. Remove deprecated fields/routes only after the deployed website no longer reads them and rollback risk has passed.
 
 ---
@@ -1912,7 +1911,7 @@ The cron route verifies `Authorization: Bearer ${CRON_SECRET}`, uses a database 
 **Frontend:** responsive Next.js shell, theme, routes, auth UI, loading/error boundaries, profile screens.
 
 **Backend:** SSR cookie/session plumbing, profile API, upload ticket, protected layouts, RLS verification.
-**Exit:** sign-up/sign-in/OAuth callback/onboarding/profile/sign-out work in Vercel Preview and local development.
+**Exit:** sign-up/sign-in/email-confirmation callback/onboarding/profile/sign-out work in Vercel Preview and local development.
 
 ### Phase 2 — Personal finance
 
@@ -1969,7 +1968,7 @@ A feature is done only when:
 
 These findings explain why blindly porting old files is unsafe.
 
-1. Old prose says Google-only auth; current app also implements email/password sign-in and sign-up. **Decision:** preserve both.
+1. Old prose says Google-only auth. **Decision:** support email/password sign-in and sign-up only.
 2. Old prose implies a new profile may be absent; active database trigger creates it. **Decision:** onboarding means incomplete required fields, not missing-profile detection alone.
 3. Legacy repository directly adds/removes members and deletes groups, but active migrations provide safe RPCs and tighter RLS. **Decision:** Node API uses safe RPCs.
 4. Old prose says confirmed settlements update profile balance. Active migrations treat personal expense shares as spending and settlements as group debt reduction. **Decision:** keep spending and debt semantics separate.
@@ -2037,8 +2036,8 @@ Run relevant tests and report changed files, verification, and remaining risks.
 - [ ] Local production build completes and Vercel Preview serves pages and `/api/v1` from one origin.
 - [ ] Custom production domain, canonical redirect, DNS, TLS, security headers, and health/readiness routes work.
 - [ ] Route guard directs logged-out, incomplete, and complete users without private-content or login flashes.
-- [ ] Email/password and Google auth work.
-- [ ] OAuth production/preview/local callback allowlists cannot create open redirects.
+- [ ] Email/password auth works.
+- [ ] Email-confirmation production/preview/local callback allowlists cannot create open redirects.
 - [ ] Secure sign-out clears private browser caches and unregisters or schedules cleanup of the Web Push subscription.
 - [ ] Personal transaction create/read/update/delete works.
 - [ ] Month, filters, monthly/lifetime/category totals are correct.
