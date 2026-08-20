@@ -11,14 +11,16 @@ import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation 
 import { api, messageForError } from '@/lib/api/client';
 import { queryKeys } from '@/lib/api/queries';
 import { currentMonth, formatMoney, formatMonthLabel, getFirstName } from '@/lib/utils';
+import { useHydrated } from '@/lib/use-hydrated';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const hydrated = useHydrated();
   const month = currentMonth();
   const dashboardQuery = useQuery({ queryKey: queryKeys.dashboard(month), queryFn: () => api.dashboard(month) });
   const errorPresentation = queryErrorPresentation(dashboardQuery.error, dashboardQuery.data !== undefined);
 
-  if (dashboardQuery.isPending) return <><AppHeader title="Dashboard" /><PageLoading label="Loading dashboard" /></>;
+  if (!hydrated || dashboardQuery.isPending) return <><AppHeader title="Dashboard" /><PageLoading label="Loading dashboard" /></>;
   if (errorPresentation === 'blocking') return <><AppHeader title="Dashboard" /><PageError message={messageForError(dashboardQuery.error)} retry={() => dashboardQuery.refetch()} /></>;
   const data = dashboardQuery.data!;
   const { profile, monthlyIncome, monthlyExpenses, monthlyNet, totalYouOwe, totalOwedToYou, recentTransactions, unreadNotificationCount } = data;

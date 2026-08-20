@@ -10,6 +10,7 @@ import { queryKeys } from '@/lib/api/queries';
 import { currentMonth } from '@/lib/utils';
 import { PushRefreshBridge } from '@/features/push/PushRefreshBridge';
 import type { Profile } from '@/lib/types';
+import { useHydrated } from '@/lib/use-hydrated';
 import { shouldShowMobileBottomNav } from '@/components/layout/mobile-navigation';
 
 interface DashboardFrameProps {
@@ -19,10 +20,11 @@ interface DashboardFrameProps {
 
 export function DashboardFrame({ children, initialProfile }: DashboardFrameProps) {
   const pathname = usePathname();
+  const hydrated = useHydrated();
   const month = currentMonth();
   const profileQuery = useQuery({ queryKey: queryKeys.profile, queryFn: api.profile.get, initialData: initialProfile });
   const dashboardQuery = useQuery({ queryKey: queryKeys.dashboard(month), queryFn: () => api.dashboard(month) });
-  const unreadCount = dashboardQuery.data?.unreadNotificationCount ?? 0;
+  const unreadCount = hydrated ? (dashboardQuery.data?.unreadNotificationCount ?? 0) : 0;
   const profile = profileQuery.data;
 
   return (
