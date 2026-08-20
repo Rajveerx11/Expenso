@@ -3,6 +3,7 @@ import {
   ConfigurationError,
   getCronSecret,
   getDatabaseWebhookSecret,
+  getServiceRoleConfig,
   getVapidPublicKey,
   getWebPushConfig,
   getRuntimeConfig,
@@ -10,6 +11,7 @@ import {
 
 const names = [
   'CRON_SECRET', 'DATABASE_WEBHOOK_SECRET', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT',
+  'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
   'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SITE_URL',
 ] as const;
 const original = Object.fromEntries(names.map((name) => [name, process.env[name]]));
@@ -44,6 +46,15 @@ describe('internal delivery configuration', () => {
     delete process.env.VAPID_PRIVATE_KEY;
     delete process.env.VAPID_SUBJECT;
     expect(getVapidPublicKey()).toBe('C'.repeat(87));
+  });
+
+  it('prefers a revocable Supabase secret key and retains legacy local-stack fallback', () => {
+    process.env.SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'legacy-service-role';
+    process.env.SUPABASE_SECRET_KEY = 'sb_secret_replacement';
+    expect(getServiceRoleConfig().serviceRoleKey).toBe('sb_secret_replacement');
+    delete process.env.SUPABASE_SECRET_KEY;
+    expect(getServiceRoleConfig().serviceRoleKey).toBe('legacy-service-role');
   });
 
   it('fails closed for malformed VAPID keys and short internal secrets', () => {

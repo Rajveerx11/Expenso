@@ -31,4 +31,11 @@ describe('remaining mutation field-error wiring', () => {
     expect(settlement).toContain("fieldErrorFor(serverErrors, 'transactionRef')");
     expect(settlement).toContain("setStep('input')");
   });
+
+  it('does not claim a UPI payment merely because review was opened', () => {
+    const settlement = source('src/app/(dashboard)/groups/[groupId]/settle/[receiverId]/page.tsx');
+
+    expect(settlement).toContain("onClick={() => setStep('review')}");
+    expect(settlement).not.toMatch(/setAcknowledged\(true\);\s*setStep\('review'\)/);
+  });
 });

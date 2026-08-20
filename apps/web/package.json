@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "verify:client-secrets": "node scripts/verify-client-secret-boundary.mjs"
+    "db:verify": "node --env-file=.env.local scripts/verify-db.mjs",
+    "verify:client-secrets": "node scripts/verify-client-secret-boundary.mjs",
+    "verify:source-secrets": "node scripts/verify-source-secret-boundary.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

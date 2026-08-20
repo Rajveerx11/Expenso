@@ -168,10 +168,9 @@ export function buildUPIUri(params: {
   receiverName: string;
   amount: string;
   groupName?: string;
-  correlationRef?: string;
-  scheme?: 'upi' | 'gpay' | 'phonepe' | 'paytm';
+  correlationRef: string;
 }): string {
-  const { receiverUpiId, receiverName, amount, groupName, scheme = 'upi' } = params;
+  const { receiverUpiId, receiverName, amount, groupName, correlationRef } = params;
   const numAmount = parseFloat(amount);
   const formattedAmount = isNaN(numAmount) || numAmount <= 0 ? amount.trim() : numAmount.toFixed(2);
   const cleanNote = groupName?.trim()
@@ -179,16 +178,23 @@ export function buildUPIUri(params: {
     : 'Expenso settlement';
   const cleanName = receiverName.trim();
   const cleanUpi = receiverUpiId.trim();
+  const cleanReference = correlationRef.trim();
+  if (!/^[A-Za-z0-9]{1,35}$/.test(cleanReference)) {
+    throw new Error('UPI transaction reference must be 1-35 alphanumeric characters.');
+  }
 
-  // Exact NPCI UPI query string with literal @ for payee address
-  const encodedName = encodeURIComponent(cleanName);
-  const encodedNote = encodeURIComponent(cleanNote);
-  const queryString = `pa=${cleanUpi}&pn=${encodedName}&am=${formattedAmount}&cu=INR&tn=${encodedNote}`;
+  const query = new URLSearchParams();
+  query.set('pa', cleanUpi);
+  query.set('pn', cleanName);
+  query.set('am', formattedAmount);
+  query.set('cu', 'INR');
+  query.set('tr', cleanReference);
+  query.set('tn', cleanNote.slice(0, 80));
+  return `upi://pay?${query.toString()}`;
+}
 
-  if (scheme === 'gpay') return `tez://upi/pay?${queryString}`;
-  if (scheme === 'phonepe') return `phonepe://pay?${queryString}`;
-  if (scheme === 'paytm') return `paytmmp://pay?${queryString}`;
-  return `upi://pay?${queryString}`;
+export function createUPITransactionRef(): string {
+  return crypto.randomUUID().replaceAll('-', '');
 }
 
 // ─── Split Calculation ───────────────────────────────────────

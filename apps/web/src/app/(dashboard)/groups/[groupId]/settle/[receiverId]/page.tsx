@@ -14,7 +14,7 @@ import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation 
 import type { GroupBalance, GroupMember, GroupSummary } from '@/lib/types';
 import { ApiClientError, api, createIdempotencyKey, fieldErrorFor, fieldErrorsFor, focusFirstInvalidField, messageForError } from '@/lib/api/client';
 import { queryKeys } from '@/lib/api/queries';
-import { buildUPIUri, formatMoney } from '@/lib/utils';
+import { buildUPIUri, createUPITransactionRef, formatMoney } from '@/lib/utils';
 import {
   claimInput,
   conflictCopy,
@@ -85,36 +85,12 @@ function SettleUpFlow(options: {
     ),
   });
 
-  const paymentUri = receiverUpiId ? buildUPIUri({
+  const paymentUri = receiverUpiId && correlationRef ? buildUPIUri({
     receiverUpiId,
     receiverName: receiver.fullName,
     amount: amount.trim(),
     groupName: group.name,
-    scheme: 'upi',
-  }) : '';
-
-  const gpayUri = receiverUpiId ? buildUPIUri({
-    receiverUpiId,
-    receiverName: receiver.fullName,
-    amount: amount.trim(),
-    groupName: group.name,
-    scheme: 'gpay',
-  }) : '';
-
-  const phonepeUri = receiverUpiId ? buildUPIUri({
-    receiverUpiId,
-    receiverName: receiver.fullName,
-    amount: amount.trim(),
-    groupName: group.name,
-    scheme: 'phonepe',
-  }) : '';
-
-  const paytmUri = receiverUpiId ? buildUPIUri({
-    receiverUpiId,
-    receiverName: receiver.fullName,
-    amount: amount.trim(),
-    groupName: group.name,
-    scheme: 'paytm',
+    correlationRef,
   }) : '';
 
   useEffect(() => {
@@ -160,7 +136,7 @@ function SettleUpFlow(options: {
     setRequestError('');
     if (!validate(false)) return;
     if (receiverUpiId) {
-      setCorrelationRef(`EXPENSO-${crypto.randomUUID()}`);
+      setCorrelationRef(createUPITransactionRef());
       setUpiHandoffState('idle');
       setAcknowledged(false);
       setStep('payment');
@@ -355,32 +331,9 @@ function SettleUpFlow(options: {
               <ExternalLink size={18} aria-hidden="true" /> Open in UPI App
             </a>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
-              <a
-                href={gpayUri}
-                onClick={beginUpiHandoff}
-                className="btn btn-secondary btn-sm"
-                style={{ textDecoration: 'none', justifyContent: 'center', fontSize: 12, padding: '8px 4px' }}
-              >
-                Google Pay
-              </a>
-              <a
-                href={phonepeUri}
-                onClick={beginUpiHandoff}
-                className="btn btn-secondary btn-sm"
-                style={{ textDecoration: 'none', justifyContent: 'center', fontSize: 12, padding: '8px 4px' }}
-              >
-                PhonePe
-              </a>
-              <a
-                href={paytmUri}
-                onClick={beginUpiHandoff}
-                className="btn btn-secondary btn-sm"
-                style={{ textDecoration: 'none', justifyContent: 'center', fontSize: 12, padding: '8px 4px' }}
-              >
-                Paytm
-              </a>
-            </div>
+            <p style={{ fontSize: 12, color: 'var(--color-medium)', lineHeight: 1.5, marginTop: 10 }}>
+              Your phone will show every installed app that accepts standard UPI payment links. If one blocks the link, copy the UPI ID and amount below and pay inside that app.
+            </p>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => copyValue(receiverUpiId ?? '', 'UPI ID')}><Copy size={14} aria-hidden="true" /> Copy UPI ID</button>
@@ -401,10 +354,7 @@ function SettleUpFlow(options: {
             <PrimaryButton
               type="button"
               fullWidth
-              onClick={() => {
-                setAcknowledged(true);
-                setStep('review');
-              }}
+              onClick={() => setStep('review')}
             >
               Review Claim
             </PrimaryButton>

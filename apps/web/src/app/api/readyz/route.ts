@@ -1,5 +1,5 @@
 import { AppError } from '@/server/http/errors';
-import { fail, handleRouteError, ok, requestIdFor } from '@/server/http/response';
+import { handleRouteError, ok, requestIdFor } from '@/server/http/response';
 import { getRuntimeConfig } from '@/server/config/env';
 
 export const dynamic = 'force-dynamic';
@@ -24,14 +24,14 @@ export async function GET(request: Request) {
       }),
     ]);
     if (!authResponse.ok || !schemaResponse.ok || await schemaResponse.json() !== true) {
-      return fail(new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true }), requestId);
+      throw new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true });
     }
     return ok({ status: 'ready' as const }, requestId, { isPrivate: false });
   } catch (error) {
     if (error instanceof AppError && error.code === 'DEPENDENCY_UNAVAILABLE') {
       return handleRouteError(error, requestId);
     }
-    return fail(
+    return handleRouteError(
       new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true, cause: error }),
       requestId,
     );

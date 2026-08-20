@@ -18,7 +18,8 @@ Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
 | `RATE_LIMIT_SECRET` | server only | Random 32+ character secret matching the Supabase Vault entry below. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | browser-safe | Public VAPID key passed to `PushManager.subscribe`. |
 | `SUPABASE_URL` | server only | Supabase project URL used by the delivery worker. |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only | Supabase service-role key used only by internal delivery routes. |
+| `SUPABASE_SECRET_KEY` | server only | Preferred revocable `sb_secret_` key used only by internal delivery routes and trusted verification tooling. |
+| `SUPABASE_SERVICE_ROLE_KEY` | server only | Legacy/local-stack fallback. Do not use for a hosted deployment after migrating to `SUPABASE_SECRET_KEY`. |
 | `VAPID_PUBLIC_KEY` | server only | Public half of the delivery worker VAPID identity. |
 | `VAPID_PRIVATE_KEY` | server only | Private VAPID signing key. |
 | `VAPID_SUBJECT` | server only | `mailto:` operations contact or owned HTTPS URL. |
@@ -137,11 +138,14 @@ From `apps/web`:
 
 ```bash
 npm ci
+npm run db:verify
 npm run lint
 npm run typecheck
 npm test
 npm run build
 npm audit --audit-level=high
 ```
+
+`npm run db:verify` loads `.env.local`, checks schema readiness, reports table counts, and verifies anonymous reads expose no rows. It never reads row contents or changes data. Run the same script with deployment environment values when local and hosted data disagree.
 
 CI runs this sequence plus an isolated Supabase migration and pgTAP suite for every branch and pull request.

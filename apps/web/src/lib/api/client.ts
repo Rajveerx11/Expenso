@@ -143,14 +143,26 @@ async function apiRequest<T>(path: string, options: ApiOptions = {}, retryCsrf =
   if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey);
   if (isMutation(method)) headers.set('x-csrf-token', await getCsrfToken());
 
-  const response = await fetch(path, {
-    ...options,
-    method,
-    headers,
-    body: options.json === undefined ? undefined : JSON.stringify(options.json),
-    credentials: 'same-origin',
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      method,
+      headers,
+      body: options.json === undefined ? undefined : JSON.stringify(options.json),
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+  } catch {
+    const error = new ApiClientError(0, {
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: 'Could not reach Expenso. Check your connection and try again.',
+      requestId: crypto.randomUUID(),
+      retryable: true,
+    });
+    reportApiFailure(method, path, error);
+    throw error;
+  }
   const payload = await response.json().catch(() => null) as SuccessResponse<T> | ErrorResponse | null;
   if (!response.ok || !payload || !('data' in payload)) {
     const retryAfter = Number(response.headers.get('retry-after'));
@@ -164,9 +176,24 @@ async function apiRequest<T>(path: string, options: ApiOptions = {}, retryCsrf =
       return apiRequest<T>(path, options, false);
     }
     if (response.status === 401) handleExpiredSession(path);
+    reportApiFailure(method, path, error);
     throw error;
   }
   return payload;
+}
+
+function reportApiFailure(method: string, path: string, error: ApiClientError): void {
+  const safePath = path
+    .split('?', 1)[0]
+    .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ':id');
+  console.error('[Expenso API request failed]', {
+    method,
+    path: safePath,
+    status: error.status,
+    code: error.code,
+    requestId: error.requestId,
+    retryable: error.retryable,
+  });
 }
 
 function query(path: string, values: Record<string, string | number | undefined>): string {

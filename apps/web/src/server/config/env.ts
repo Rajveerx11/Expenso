@@ -85,9 +85,10 @@ export function getRateLimitSecret(): string {
 }
 
 export function getServiceRoleConfig() {
+  const secretKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   return {
     supabaseUrl: parseUrl('SUPABASE_URL', process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL),
-    serviceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY),
+    serviceRoleKey: required('SUPABASE_SECRET_KEY', secretKey),
   };
 }
 

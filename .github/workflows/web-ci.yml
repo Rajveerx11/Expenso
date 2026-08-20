@@ -49,6 +49,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Verify source contains no committed secrets
+        run: npm run verify:source-secrets
       - name: Lint
         run: npm run lint
       - name: Type-check
@@ -70,7 +72,7 @@ jobs:
           RATE_LIMIT_SALT: ci-rate-limit-salt-0000000000000001
           RATE_LIMIT_SECRET: sentinel-rate-secret-000000000000001
           SUPABASE_URL: https://example.supabase.co
-          SUPABASE_SERVICE_ROLE_KEY: sentinel-service-role-000000000001
+          SUPABASE_SECRET_KEY: sentinel-service-role-000000000001
           NEXT_PUBLIC_VAPID_PUBLIC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
           VAPID_PUBLIC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
           VAPID_PRIVATE_KEY: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
