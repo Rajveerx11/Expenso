@@ -169,34 +169,6 @@ export function createUPIPaymentNote(groupName?: string): string {
     : 'Expenso settlement';
 }
 
-export function buildUPIUri(params: {
-  receiverUpiId: string;
-  receiverName: string;
-  amount: string;
-  groupName?: string;
-  correlationRef: string;
-}): string {
-  const { receiverUpiId, receiverName, amount, groupName, correlationRef } = params;
-  const numAmount = parseFloat(amount);
-  const formattedAmount = isNaN(numAmount) || numAmount <= 0 ? amount.trim() : numAmount.toFixed(2);
-  const cleanNote = createUPIPaymentNote(groupName);
-  const cleanName = receiverName.trim();
-  const cleanUpi = receiverUpiId.trim();
-  const cleanReference = correlationRef.trim();
-  if (!/^[A-Za-z0-9]{1,35}$/.test(cleanReference)) {
-    throw new Error('UPI transaction reference must be 1-35 alphanumeric characters.');
-  }
-
-  const query = new URLSearchParams();
-  query.set('pa', cleanUpi);
-  query.set('pn', cleanName);
-  query.set('am', formattedAmount);
-  query.set('cu', 'INR');
-  query.set('tr', cleanReference);
-  query.set('tn', cleanNote.slice(0, 80));
-  return `upi://pay?${query.toString()}`;
-}
-
 export function createUPITransactionRef(): string {
   return crypto.randomUUID().replaceAll('-', '');
 }

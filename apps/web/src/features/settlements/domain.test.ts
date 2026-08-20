@@ -6,7 +6,6 @@ import {
   createSubmissionKeyManager,
   findPendingSettlementAcrossPages,
   flattenPagedItems,
-  nextUpiHandoffState,
   normalizeSettlementAmount,
   outstandingAmount,
   payableBalanceFor,
@@ -24,22 +23,6 @@ const payable: GroupBalance = {
 };
 
 describe('settlement claim domain', () => {
-  it('prompts only after an explicit UPI launch returns and never infers completion', () => {
-    expect(nextUpiHandoffState('idle', 'return')).toBe('idle');
-    expect(nextUpiHandoffState('idle', 'launch')).toBe('launching');
-    expect(nextUpiHandoffState('launching', 'leave')).toBe('away');
-    expect(nextUpiHandoffState('away', 'return')).toBe('returned');
-    expect(nextUpiHandoffState('returned', 'return')).toBe('returned');
-    expect(nextUpiHandoffState('returned', 'complete')).toBe('completed');
-  });
-
-  it('handles a cancelled or unavailable UPI app without marking payment complete', () => {
-    expect(nextUpiHandoffState('launching', 'return')).toBe('returned');
-    expect(nextUpiHandoffState('returned', 'cancel')).toBe('idle');
-    expect(nextUpiHandoffState('idle', 'complete')).toBe('idle');
-    expect(nextUpiHandoffState('idle', 'show-prompt')).toBe('returned');
-  });
-
   it('normalizes exact decimal input without floating-point arithmetic', () => {
     expect(normalizeSettlementAmount('001.2')).toBe('1.20');
     expect(normalizeSettlementAmount('0')).toBeNull();

@@ -39,4 +39,15 @@ describe('remaining mutation field-error wiring', () => {
     expect(settlement).toContain('await submitClaim(true)');
     expect(settlement).toContain('must confirm receipt before balances change');
   });
+
+  it('does not launch a raw personal UPI intent that payment apps can reject', () => {
+    const settlement = source('src/app/(dashboard)/groups/[groupId]/settle/[receiverId]/page.tsx');
+    const utils = source('src/lib/utils.ts');
+
+    expect(settlement).not.toContain('upi://pay');
+    expect(settlement).not.toContain('href={paymentUri}');
+    expect(utils).not.toContain('buildUPIUri');
+    expect(settlement).toContain('Copy UPI ID');
+    expect(settlement).toContain('Open PhonePe, Google Pay, FamApp');
+  });
 });

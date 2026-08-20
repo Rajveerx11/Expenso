@@ -6,19 +6,6 @@ export function flattenPagedItems<T>(pages: Array<{ items: T[] }>): T[] {
   return pages.flatMap((page) => page.items);
 }
 
-export type UpiHandoffState = 'idle' | 'launching' | 'away' | 'returned' | 'completed';
-export type UpiHandoffEvent = 'launch' | 'leave' | 'return' | 'show-prompt' | 'complete' | 'cancel';
-
-export function nextUpiHandoffState(state: UpiHandoffState, event: UpiHandoffEvent): UpiHandoffState {
-  if (event === 'launch') return 'launching';
-  if (event === 'show-prompt') return 'returned';
-  if (event === 'cancel') return 'idle';
-  if (event === 'leave') return state === 'launching' ? 'away' : state;
-  if (event === 'return') return state === 'launching' || state === 'away' ? 'returned' : state;
-  if (event === 'complete') return state === 'returned' ? 'completed' : state;
-  return state;
-}
-
 const MONEY_INPUT = /^\d{1,10}(?:\.\d{1,2})?$/;
 
 export interface SettlementClaimInput {

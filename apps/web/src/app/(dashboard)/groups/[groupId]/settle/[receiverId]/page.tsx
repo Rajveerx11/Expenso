@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, Copy, ExternalLink, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Copy, ShieldCheck } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { Avatar } from '@/components/ui/Avatar';
@@ -14,19 +14,17 @@ import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation 
 import type { GroupBalance, GroupMember, GroupSummary } from '@/lib/types';
 import { ApiClientError, api, createIdempotencyKey, fieldErrorFor, fieldErrorsFor, focusFirstInvalidField, messageForError } from '@/lib/api/client';
 import { queryKeys } from '@/lib/api/queries';
-import { buildUPIUri, createUPIPaymentNote, createUPITransactionRef, formatMoney } from '@/lib/utils';
+import { createUPIPaymentNote, createUPITransactionRef, formatMoney } from '@/lib/utils';
 import {
   claimInput,
   conflictCopy,
   createSubmissionKeyManager,
-  nextUpiHandoffState,
   outstandingAmount,
   payableBalanceFor,
-  type UpiHandoffState,
   validateSettlementClaim,
 } from '@/features/settlements/domain';
 import { useSettleUpData } from '@/features/settlements/hooks';
-import { UpiHandoffPrompt } from '@/features/settlements/UpiHandoffPrompt';
+import { PaymentCompletionPrompt } from '@/features/settlements/PaymentCompletionPrompt';
 
 type ClaimStep = 'input' | 'payment' | 'review';
 
@@ -73,10 +71,8 @@ function SettleUpFlow(options: {
   const [errors, setErrors] = useState<ReturnType<typeof validateSettlementClaim>>({});
   const [requestError, setRequestError] = useState('');
   const [copied, setCopied] = useState('');
-  const [upiHandoffState, setUpiHandoffState] = useState<UpiHandoffState>('idle');
   const [createdSettlementId, setCreatedSettlementId] = useState<string | null>(null);
   const keyManager = useRef(createSubmissionKeyManager(() => createIdempotencyKey('settlement')));
-  const upiReturnTimer = useRef<number | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const createSettlement = useMutation({
     mutationFn: (variables: { input: ReturnType<typeof claimInput>; idempotencyKey: string }) => (
@@ -84,41 +80,7 @@ function SettleUpFlow(options: {
     ),
   });
 
-  const paymentUri = receiverUpiId && correlationRef ? buildUPIUri({
-    receiverUpiId,
-    receiverName: receiver.fullName,
-    amount: amount.trim(),
-    groupName: group.name,
-    correlationRef,
-  }) : '';
   const paymentNote = createUPIPaymentNote(group.name);
-
-  useEffect(() => {
-    if (step !== 'payment') return;
-    const clearReturnTimer = () => {
-      if (upiReturnTimer.current !== null) window.clearTimeout(upiReturnTimer.current);
-      upiReturnTimer.current = null;
-    };
-    const markAway = () => setUpiHandoffState((current) => nextUpiHandoffState(current, 'leave'));
-    const markReturned = () => {
-      if (document.visibilityState !== 'visible') return;
-      clearReturnTimer();
-      setUpiHandoffState((current) => nextUpiHandoffState(current, 'return'));
-    };
-    const visibilityChanged = () => {
-      if (document.visibilityState === 'hidden') markAway();
-      else markReturned();
-    };
-    window.addEventListener('blur', markAway);
-    window.addEventListener('focus', markReturned);
-    document.addEventListener('visibilitychange', visibilityChanged);
-    return () => {
-      clearReturnTimer();
-      window.removeEventListener('blur', markAway);
-      window.removeEventListener('focus', markReturned);
-      document.removeEventListener('visibilitychange', visibilityChanged);
-    };
-  }, [step]);
 
   function validate(requireAcknowledgement = false, acknowledgementOverride = acknowledged) {
     const nextErrors = validateSettlementClaim({
@@ -137,7 +99,6 @@ function SettleUpFlow(options: {
     if (!validate(false)) return;
     if (receiverUpiId) {
       setCorrelationRef(createUPITransactionRef());
-      setUpiHandoffState('idle');
       setAcknowledged(false);
       setStep('payment');
     } else {
@@ -145,42 +106,13 @@ function SettleUpFlow(options: {
     }
   }
 
-  function beginUpiHandoff() {
-    setAcknowledged(false);
-    setErrors((current) => ({ ...current, acknowledgement: undefined }));
-    setUpiHandoffState((current) => nextUpiHandoffState(current, 'launch'));
-    if (upiReturnTimer.current !== null) window.clearTimeout(upiReturnTimer.current);
-    upiReturnTimer.current = window.setTimeout(() => {
-      upiReturnTimer.current = null;
-      setUpiHandoffState((current) => (
-        current === 'launching' ? nextUpiHandoffState(current, 'return') : current
-      ));
-    }, 1_500);
-  }
-
-  function showUpiReturnPrompt() {
-    if (upiReturnTimer.current !== null) window.clearTimeout(upiReturnTimer.current);
-    upiReturnTimer.current = null;
-    setUpiHandoffState((current) => nextUpiHandoffState(current, 'show-prompt'));
-  }
-
   async function confirmUpiCompletion() {
     setAcknowledged(true);
     setErrors((current) => ({ ...current, acknowledgement: undefined }));
-    setUpiHandoffState((current) => nextUpiHandoffState(current, 'complete'));
-    const submitted = await submitClaim(true);
-    if (!submitted) setUpiHandoffState('returned');
-  }
-
-  function cancelUpiCompletion() {
-    setAcknowledged(false);
-    setUpiHandoffState((current) => nextUpiHandoffState(current, 'cancel'));
+    await submitClaim(true);
   }
 
   function backToInput() {
-    if (upiReturnTimer.current !== null) window.clearTimeout(upiReturnTimer.current);
-    upiReturnTimer.current = null;
-    setUpiHandoffState('idle');
     setAcknowledged(false);
     setStep('input');
   }
@@ -222,7 +154,6 @@ function SettleUpFlow(options: {
       if (error instanceof ApiClientError && error.status === 409) {
         await options.refetchLatest();
         setStep('input');
-        setUpiHandoffState('idle');
         setAcknowledged(false);
         setAmount('');
         setRequestError(conflictCopy(error.code));
@@ -312,16 +243,16 @@ function SettleUpFlow(options: {
             />
           </FormField>
           <PrimaryButton type="button" fullWidth size="lg" onClick={continueFromInput}>
-            {receiverUpiId ? <><ExternalLink size={18} aria-hidden="true" /> Choose UPI App</> : 'Review Payment Claim'}
+            {receiverUpiId ? 'Continue to Payment' : 'Review Payment Claim'}
           </PrimaryButton>
         </>
       )}
 
-      {step === 'payment' && paymentUri && (
+      {step === 'payment' && receiverUpiId && (
         <>
           <div className="card" style={{ padding: 20, textAlign: 'center' }}>
-            <h2 style={{ fontSize: 18, fontWeight: 750, color: 'var(--color-black)' }}>Pay {formatMoney(amount)} with UPI</h2>
-            <p style={{ fontSize: 13, color: 'var(--color-medium)', margin: '6px 0 16px' }}>Choose an installed UPI app. Expenso will prefill these details.</p>
+            <h2 style={{ fontSize: 18, fontWeight: 750, color: 'var(--color-black)' }}>Pay {formatMoney(amount)} in your UPI app</h2>
+            <p style={{ fontSize: 13, color: 'var(--color-medium)', margin: '6px 0 16px', lineHeight: 1.5 }}>External personal-payment links are blocked by some UPI apps. Use these details inside your payment app instead.</p>
             <div style={{ display: 'grid', gap: 10, padding: 14, textAlign: 'left', borderRadius: 14, background: 'var(--color-primary-lightest)', border: '1px solid var(--color-primary-medium)' }}>
               <div>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--color-medium)' }}>To</span>
@@ -337,31 +268,23 @@ function SettleUpFlow(options: {
               </div>
             </div>
 
-            <a
-              href={paymentUri}
-              onClick={beginUpiHandoff}
-              className="btn btn-primary"
-              style={{ display: 'flex', width: '100%', textDecoration: 'none', justifyContent: 'center', marginTop: 16 }}
-            >
-              <ExternalLink size={18} aria-hidden="true" /> Choose UPI App
-            </a>
+            <ol style={{ margin: '16px 0 0', paddingLeft: 22, textAlign: 'left', color: 'var(--color-dark)', fontSize: 13, lineHeight: 1.7 }}>
+              <li>Copy the UPI ID below.</li>
+              <li>Open PhonePe, Google Pay, FamApp, or another UPI app normally.</li>
+              <li>Choose Pay by UPI ID, paste it, and enter {formatMoney(amount)}.</li>
+            </ol>
 
-            <p style={{ fontSize: 12, color: 'var(--color-medium)', lineHeight: 1.5, marginTop: 10 }}>
-              Your phone should show installed apps that accept standard UPI links. If an app blocks the request, copy the details below and pay manually inside that app.
-            </p>
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => copyValue(receiverUpiId ?? '', 'UPI ID')}><Copy size={14} aria-hidden="true" /> Copy UPI ID</button>
-              <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => copyValue(amount, 'Amount')}><Copy size={14} aria-hidden="true" /> Copy Amount</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+              <button type="button" className="btn btn-primary btn-sm" style={{ gridColumn: '1 / -1' }} onClick={() => copyValue(receiverUpiId, 'UPI ID')}><Copy size={14} aria-hidden="true" /> Copy UPI ID</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => copyValue(amount, 'Amount')}><Copy size={14} aria-hidden="true" /> Copy Amount</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => copyValue(paymentNote, 'Note')}><Copy size={14} aria-hidden="true" /> Copy Note</button>
             </div>
             {copied && <p role="status" aria-live="polite" style={{ fontSize: 12, color: 'var(--color-medium)', marginTop: 8 }}>{copied}</p>}
           </div>
 
-          <UpiHandoffPrompt
-            state={upiHandoffState}
-            onShowPrompt={showUpiReturnPrompt}
+          <PaymentCompletionPrompt
             onComplete={() => void confirmUpiCompletion()}
-            onCancel={cancelUpiCompletion}
+            onCancel={backToInput}
             submitting={createSettlement.isPending}
           />
 
