@@ -1,26 +1,64 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Wallet, CheckCircle } from 'lucide-react';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/Buttons';
 import { FormField, Input } from '@/components/ui/FormField';
+import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation } from '@/components/ui/AsyncState';
+import { api, fieldErrorFor, fieldErrorsFor, focusFirstInvalidField, messageForError, safeRelativePath, type ApiFieldErrors } from '@/lib/api/client';
+import { queryKeys } from '@/lib/api/queries';
+import type { Profile } from '@/lib/types';
+
+export function onboardingDestination(search: string): string {
+  return safeRelativePath(new URLSearchParams(search).get('next'));
+}
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const [displayName, setDisplayName] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [loading, setLoading] = useState(false);
+  const profileQuery = useQuery({ queryKey: queryKeys.profile, queryFn: api.profile.get });
+  const errorPresentation = queryErrorPresentation(profileQuery.error, profileQuery.data !== undefined);
 
-  async function handleContinue() {
-    setLoading(true);
-    // TODO: Save profile to Supabase
-    await new Promise(r => setTimeout(r, 800));
-    router.push('/dashboard');
-    setLoading(false);
+  if (profileQuery.isPending) return <main><PageLoading label="Loading profile" /></main>;
+  if (errorPresentation === 'blocking') return <main><PageError message={messageForError(profileQuery.error)} retry={() => profileQuery.refetch()} /></main>;
+
+  return <main><OnboardingForm key={profileQuery.data!.updatedAt} initialProfile={profileQuery.data!} refreshWarning={errorPresentation === 'background'} retry={() => void profileQuery.refetch()} isRetrying={profileQuery.isFetching} /></main>;
+}
+
+function OnboardingForm({ initialProfile, refreshWarning, retry, isRetrying }: { initialProfile: Profile; refreshWarning: boolean; retry: () => void; isRetrying: boolean }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [displayName, setDisplayName] = useState(initialProfile.fullName);
+  const [upiId, setUpiId] = useState(initialProfile.upiId ?? '');
+  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<ApiFieldErrors>({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const updateProfile = useMutation({
+    mutationFn: api.profile.update,
+    onSuccess: (profile) => queryClient.setQueryData(queryKeys.profile, profile),
+  });
+
+  async function handleContinue(event: React.FormEvent) {
+    event.preventDefault();
+    setError('');
+    setFieldErrors({});
+    if (!displayName.trim()) { setError('Display name is required.'); return; }
+    try {
+      await updateProfile.mutateAsync({ fullName: displayName, upiId: upiId.trim() || null });
+      router.replace(onboardingDestination(window.location.search));
+      router.refresh();
+    } catch (requestError) {
+      setError(messageForError(requestError));
+      setFieldErrors(fieldErrorsFor(requestError));
+      focusFirstInvalidField(formRef.current);
+    }
   }
 
+  const displayNameError = fieldErrorFor(fieldErrors, 'fullName', 'displayName');
+  const upiIdError = fieldErrorFor(fieldErrors, 'upiId');
+
   return (
-    <div className="animate-slideUp">
+    <form ref={formRef} className="animate-slideUp" onSubmit={handleContinue}>
+      {refreshWarning && <BackgroundRefreshError retry={retry} isRetrying={isRetrying} />}
       {/* Icon */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
         <div style={{
@@ -41,21 +79,23 @@ export default function OnboardingPage() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
-        <FormField label="Display Name" required hint="This is how your friends will see you">
+        <FormField label="Display Name" error={displayNameError} required hint="This is how your friends will see you">
           <Input
             type="text"
             value={displayName}
-            onChange={e => setDisplayName(e.target.value)}
+            onChange={e => { setDisplayName(e.target.value); setFieldErrors((current) => ({ ...current, fullName: [], displayName: [] })); }}
+            error={Boolean(displayNameError)}
             placeholder="Your name"
             autoComplete="name"
           />
         </FormField>
 
-        <FormField label="UPI ID" hint="Optional — e.g. name@bank. Friends can pay you directly.">
+        <FormField label="UPI ID" error={upiIdError} hint="Optional — e.g. name@bank. Friends can pay you directly.">
           <Input
             type="text"
             value={upiId}
-            onChange={e => setUpiId(e.target.value)}
+            onChange={e => { setUpiId(e.target.value); setFieldErrors((current) => ({ ...current, upiId: [] })); }}
+            error={Boolean(upiIdError)}
             placeholder="name@bank"
             inputMode="email"
             autoComplete="off"
@@ -71,14 +111,15 @@ export default function OnboardingPage() {
             </div>
           ))}
         </div>
+        {error && <div role="alert" style={{ color: 'var(--color-red)', fontSize: 13 }}>{error}</div>}
       </div>
 
-      <PrimaryButton fullWidth size="lg" loading={loading} onClick={handleContinue}>
+      <PrimaryButton type="submit" fullWidth size="lg" loading={updateProfile.isPending}>
         Get Started
       </PrimaryButton>
-      <SecondaryButton fullWidth style={{ marginTop: '12px' }} onClick={() => router.push('/dashboard')}>
+      <SecondaryButton type="button" fullWidth style={{ marginTop: '12px' }} onClick={() => router.push(onboardingDestination(window.location.search))}>
         Skip for now
       </SecondaryButton>
-    </div>
+    </form>
   );
 }

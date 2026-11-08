@@ -4,6 +4,7 @@ import { handleRouteError, ok, parseJson, requestIdFor } from '@/server/http/res
 import { assertMutationRequest } from '@/server/http/security';
 import { createClient } from '@/server/supabase/server';
 import { enforceAuthRateLimit } from '@/server/auth/rate-limit';
+import { getRuntimeConfig } from '@/server/config/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +15,15 @@ export async function POST(request: Request) {
     const input = await parseJson(request, signUpSchema);
     const client = await createClient();
     await enforceAuthRateLimit(client, 'signup', input.email, request);
+    const confirmationRedirect = new URL('/auth/callback', getRuntimeConfig().siteUrl);
+    confirmationRedirect.searchParams.set('next', '/onboarding');
     const { data, error } = await client.auth.signUp({
       email: input.email,
       password: input.password,
-      options: { data: { full_name: input.fullName } },
+      options: {
+        data: { full_name: input.fullName },
+        emailRedirectTo: confirmationRedirect.toString(),
+      },
     });
     if (error || !data.user) {
       throw mapAuthError(error, 'signup');

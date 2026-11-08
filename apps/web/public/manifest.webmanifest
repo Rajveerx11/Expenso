@@ -1,11 +1,33 @@
 {
+  "id": "/",
   "name": "Expenso",
   "short_name": "Expenso",
-  "description": "Track. Split. Settle. — Beautifully.",
+  "description": "Track personal spending, split group costs, and settle up.",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#FAFAFA",
   "theme_color": "#4F46E5",
   "orientation": "portrait-primary",
-  "categories": ["finance", "productivity"]
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }

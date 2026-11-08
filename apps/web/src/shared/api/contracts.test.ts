@@ -7,7 +7,9 @@ import {
   personalTransactionCreateSchema,
   personalTransactionPatchSchema,
   profilePatchSchema,
+  settlementCreateSchema,
   signUpSchema,
+  webPushSubscriptionSchema,
 } from './contracts';
 
 describe('shared API contracts', () => {
@@ -102,5 +104,46 @@ describe('shared API contracts', () => {
       splitType: 'percentage',
       splits: [{ userId: base.paidBy, percentage: '0.0000' }],
     }).success).toBe(false);
+  });
+
+  it('normalizes settlement money and bounds the optional reference', () => {
+    expect(settlementCreateSchema.parse({
+      receiverId: '00000000-0000-4000-8000-000000000001',
+      amount: '5',
+      transactionRef: ' UPI-123 ',
+    })).toEqual({
+      receiverId: '00000000-0000-4000-8000-000000000001',
+      amount: '5.00',
+      transactionRef: 'UPI-123',
+    });
+    expect(settlementCreateSchema.safeParse({
+      receiverId: '00000000-0000-4000-8000-000000000001', amount: '0.00',
+    }).success).toBe(false);
+    expect(settlementCreateSchema.safeParse({
+      receiverId: '00000000-0000-4000-8000-000000000001', amount: '1.001',
+    }).success).toBe(false);
+    expect(settlementCreateSchema.safeParse({
+      receiverId: '00000000-0000-4000-8000-000000000001',
+      amount: '1.00', transactionRef: 'x'.repeat(201),
+    }).success).toBe(false);
+  });
+
+  it('accepts reviewed Web Push services and rejects SSRF/foreign-owner fields', () => {
+    const input = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/browser-token',
+      expirationTime: null,
+      keys: { p256dh: 'A'.repeat(65), auth: 'B'.repeat(22) },
+      userAgent: 'Test Browser',
+    };
+    expect(webPushSubscriptionSchema.safeParse(input).success).toBe(true);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, endpoint: 'https://127.0.0.1/push' }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, endpoint: 'https://attacker.example/push' }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, endpoint: 'https://fcm.googleapis.com:444/push' }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, endpoint: 'https://user@fcm.googleapis.com/push' }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, endpoint: 'http://fcm.googleapis.com/push' }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, keys: { ...input.keys, p256dh: 'A'.repeat(42) } }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, expirationTime: 1 }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, expirationTime: Number.MAX_SAFE_INTEGER }).success).toBe(false);
+    expect(webPushSubscriptionSchema.safeParse({ ...input, userId: '00000000-0000-4000-8000-000000000001' }).success).toBe(false);
   });
 });

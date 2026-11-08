@@ -1,24 +1,53 @@
 'use client';
-import { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import { cloneElement, InputHTMLAttributes, isValidElement, ReactElement, ReactNode, TextareaHTMLAttributes, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FormFieldProps {
   label: string;
+  htmlFor?: string;
+  messageId?: string;
   error?: string;
   hint?: string;
   required?: boolean;
   children: ReactNode;
 }
 
-export function FormField({ label, error, hint, required, children }: FormFieldProps) {
+export function FormField({ label, htmlFor, messageId, error, hint, required, children }: FormFieldProps) {
+  const generatedId = useId();
+  const messageBaseId = messageId ?? generatedId;
+  const labelId = `${generatedId}-label`;
+  const errorId = `${messageBaseId}-error`;
+  const hintId = `${messageBaseId}-hint`;
+  const child = isValidElement(children) ? children as ReactElement<Record<string, unknown>> : null;
+  const canAssociate = child && (
+    (typeof child.type === 'string' && ['input', 'select', 'textarea'].includes(child.type))
+    || child.type === Input
+    || child.type === Textarea
+  );
+  const controlId = htmlFor ?? (canAssociate ? String(child.props.id ?? generatedId) : undefined);
+  const describedBy = [child?.props['aria-describedby'], error ? errorId : hint ? hintId : null].filter(Boolean).join(' ') || undefined;
+  const control = canAssociate
+    ? cloneElement(child, {
+        id: controlId,
+        'aria-invalid': child.props['aria-invalid'] ?? (error ? true : undefined),
+        'aria-describedby': describedBy,
+      })
+    : child && !htmlFor
+      ? cloneElement(child, {
+          role: child.props.role ?? 'group',
+          'aria-labelledby': child.props['aria-labelledby'] ?? labelId,
+          'aria-describedby': describedBy,
+        })
+      : children;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-dark)', lineHeight: 1 }}>
+      <label id={labelId} htmlFor={controlId} style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-dark)', lineHeight: 1 }}>
         {label}{required && <span style={{ color: 'var(--color-red)', marginLeft: '3px' }}>*</span>}
       </label>
-      {children}
-      {error && <span style={{ fontSize: '12px', color: 'var(--color-red)', fontWeight: 500 }}>{error}</span>}
-      {hint && !error && <span style={{ fontSize: '12px', color: 'var(--color-medium)' }}>{hint}</span>}
+      {control}
+      {error && <span id={errorId} role="alert" style={{ fontSize: '12px', color: 'var(--color-red)', fontWeight: 500 }}>{error}</span>}
+      {hint && !error && <span id={hintId} style={{ fontSize: '12px', color: 'var(--color-medium)' }}>{hint}</span>}
     </div>
   );
 }

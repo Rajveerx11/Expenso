@@ -1,155 +1,196 @@
 'use client';
-import { useParams, useRouter } from 'next/navigation';
-import { Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { Avatar } from '@/components/ui/Avatar';
-import { PrimaryButton, DangerButton, SecondaryButton } from '@/components/ui/Buttons';
-import { MOCK_SETTLEMENTS } from '@/lib/mockData';
-import { formatMoney, formatDateTime } from '@/lib/utils';
-import { useState } from 'react';
-import { SuccessOverlay } from '@/components/ui/SuccessOverlay';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DangerButton, PrimaryButton } from '@/components/ui/Buttons';
+import { BackgroundRefreshError, PageError, PageLoading, queryErrorPresentation } from '@/components/ui/AsyncState';
+import type { SettlementStatus } from '@/lib/types';
+import { ApiClientError, api, messageForError } from '@/lib/api/client';
+import { queryKeys } from '@/lib/api/queries';
+import { formatDateTime, formatMoney } from '@/lib/utils';
+import { conflictCopy } from '@/features/settlements/domain';
+import { useSettlementDetailData } from '@/features/settlements/hooks';
 
-const STATUS_CONFIG = {
-  pending_confirmation: { icon: Clock, color: 'var(--color-amber)', bg: 'var(--color-amber-soft)', label: 'Pending Confirmation' },
-  confirmed: { icon: CheckCircle, color: 'var(--color-green)', bg: 'var(--color-green-soft)', label: 'Confirmed' },
-  rejected: { icon: XCircle, color: 'var(--color-red)', bg: 'var(--color-red-soft)', label: 'Rejected' },
+const STATUS_CONFIG: Record<SettlementStatus, {
+  icon: typeof Clock;
+  color: string;
+  background: string;
+  label: string;
+}> = {
+  pending_confirmation: { icon: Clock, color: 'var(--color-amber)', background: 'var(--color-amber-soft)', label: 'Pending Confirmation' },
+  confirmed: { icon: CheckCircle, color: 'var(--color-green)', background: 'var(--color-green-soft)', label: 'Confirmed' },
+  rejected: { icon: XCircle, color: 'var(--color-red)', background: 'var(--color-red-soft)', label: 'Rejected' },
 };
+
+type SettlementAction = 'confirm' | 'reject';
 
 export default function SettlementDetailPage() {
   const { groupId, settlementId } = useParams<{ groupId: string; settlementId: string }>();
-  const router = useRouter();
-  const settlement = MOCK_SETTLEMENTS.find(s => s.id === settlementId) ?? MOCK_SETTLEMENTS[0];
-  const currentUserId = 'usr-001-demo';
-  const isReceiver = settlement.receiverId === currentUserId;
-  const isPayer = settlement.payerId === currentUserId;
+  const data = useSettlementDetailData(groupId, settlementId);
+  const queryClient = useQueryClient();
+  const [pendingAction, setPendingAction] = useState<SettlementAction | null>(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+  const respond = useMutation({
+    mutationFn: (action: SettlementAction) => api.groups.respondSettlement(groupId, settlementId, action),
+  });
 
-  const [loading, setLoading] = useState<'confirm' | 'reject' | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [actionDone, setActionDone] = useState<'confirm' | 'reject' | null>(null);
+  if (data.isPending) return <><AppHeader title="Settlement" showBack /><PageLoading label="Loading settlement" /></>;
+  const group = data.group.data;
+  const profile = data.profile.data;
+  const settlement = data.settlement.data;
+  const hasUsableData = Boolean(group && profile && settlement && data.balances.data !== undefined);
+  const errorPresentation = queryErrorPresentation(data.error, hasUsableData);
+  if (errorPresentation === 'blocking') return <><AppHeader title="Settlement" showBack /><PageError message={messageForError(data.error)} retry={() => data.refetch()} /></>;
+  if (!group || !profile || !settlement) {
+    return <><AppHeader title="Settlement" showBack /><PageError message="Settlement data is incomplete. Reload and try again." retry={() => data.refetch()} /></>;
+  }
 
+  const isPayer = settlement.payerId === profile.id;
+  const isReceiver = settlement.receiverId === profile.id;
   const status = STATUS_CONFIG[settlement.status];
   const StatusIcon = status.icon;
 
-  async function handleConfirm() {
-    setLoading('confirm');
-    // TODO: POST /api/v1/groups/{groupId}/settlements/{settlementId}/confirm
-    await new Promise(r => setTimeout(r, 900));
-    setLoading(null);
-    setActionDone('confirm');
-    setSuccess(true);
-  }
-
-  async function handleReject() {
-    setLoading('reject');
-    // TODO: POST /api/v1/groups/{groupId}/settlements/{settlementId}/reject
-    await new Promise(r => setTimeout(r, 900));
-    setLoading(null);
-    setActionDone('reject');
-    setSuccess(true);
+  async function performAction() {
+    if (!pendingAction) return;
+    const requestedAction = pendingAction;
+    setActionError('');
+    setActionMessage('');
+    try {
+      const latest = await respond.mutateAsync(requestedAction);
+      queryClient.setQueryData(queryKeys.settlement(groupId, settlementId), latest);
+      setPendingAction(null);
+      if (requestedAction === 'confirm' && latest.status !== 'confirmed') {
+        setActionMessage(`Claim was already ${latest.status}. Latest status is shown.`);
+      } else if (requestedAction === 'reject' && latest.status !== 'rejected') {
+        setActionMessage(`Claim was already ${latest.status}. Latest status is shown.`);
+      } else {
+        setActionMessage(latest.status === 'confirmed'
+          ? 'Payment confirmed. Group balances now reflect this settlement.'
+          : 'Payment claim rejected. No balances were changed.');
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settlements(groupId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.balances(groupId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.group(groupId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.groups }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+      ]);
+    } catch (error) {
+      setPendingAction(null);
+      if (error instanceof ApiClientError && error.status === 409) {
+        await data.refetch();
+        setActionError(conflictCopy(error.code));
+      } else {
+        setActionError(messageForError(error));
+      }
+    }
   }
 
   return (
     <>
-      <AppHeader title="Settlement" showBack />
+      <AppHeader title="Settlement" subtitle={group.name} showBack backHref={`/groups/${groupId}`} />
       <PageShell>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingTop: '16px', paddingBottom: '32px' }}>
-
-          {/* Status Badge */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 16, paddingBottom: 32 }}>
+          {errorPresentation === 'background' && <BackgroundRefreshError retry={() => void data.refetch()} isRetrying={data.isFetching} />}
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: status.bg, borderRadius: 'var(--radius-full)', padding: '8px 20px' }}>
-              <StatusIcon size={18} color={status.color} />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: status.color }}>{status.label}</span>
+            <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, background: status.background, borderRadius: 'var(--radius-full)', padding: '8px 20px' }}>
+              <StatusIcon size={18} color={status.color} aria-hidden="true" />
+              <span style={{ fontSize: 14, fontWeight: 700, color: status.color }}>{status.label}</span>
             </div>
           </div>
 
-          {/* Amount */}
-          <div className="card" style={{ padding: '24px', textAlign: 'center' }}>
-            <p style={{ fontSize: '13px', color: 'var(--color-medium)', marginBottom: '8px' }}>
+          {actionMessage && <div role="status" aria-live="polite" style={{ borderRadius: 12, padding: 14, background: 'var(--color-green-soft)', color: 'var(--color-green)', fontSize: 13, lineHeight: 1.5 }}>{actionMessage}</div>}
+          {actionError && <div role="alert" style={{ borderRadius: 12, padding: 14, background: 'var(--color-red-soft)', color: 'var(--color-red)', fontSize: 13, lineHeight: 1.5 }}>{actionError}</div>}
+
+          <section aria-labelledby="settlement-amount-title" className="card" style={{ padding: 24, textAlign: 'center' }}>
+            <p id="settlement-amount-title" style={{ fontSize: 13, color: 'var(--color-medium)', marginBottom: 8 }}>
               {isPayer ? 'You claimed to have paid' : `${settlement.payerName} claims to have paid`}
             </p>
-            <p style={{ fontSize: '40px', fontWeight: 800, color: 'var(--color-black)', lineHeight: 1 }}>
-              {formatMoney(settlement.amount)}
-            </p>
-          </div>
+            <p style={{ fontSize: 40, fontWeight: 800, color: 'var(--color-black)', lineHeight: 1 }}>{formatMoney(settlement.amount)}</p>
+          </section>
 
-          {/* Parties */}
-          <div className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <section aria-label="Settlement parties" className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Avatar name={settlement.payerName} size="sm" />
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '12px', color: 'var(--color-medium)' }}>Payer</p>
-                <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-black)' }}>
-                  {settlement.payerName} {isPayer && '(You)'}
-                </p>
+                <p style={{ fontSize: 12, color: 'var(--color-medium)' }}>Payer</p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-black)' }}>{settlement.payerName} {isPayer && '(You)'}</p>
               </div>
             </div>
-            <div style={{ height: '1px', background: 'var(--color-light)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ height: 1, background: 'var(--color-light)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Avatar name={settlement.receiverName} size="sm" />
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '12px', color: 'var(--color-medium)' }}>Receiver</p>
-                <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-black)' }}>
-                  {settlement.receiverName} {isReceiver && '(You)'}
-                </p>
+                <p style={{ fontSize: 12, color: 'var(--color-medium)' }}>Receiver</p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-black)' }}>{settlement.receiverName} {isReceiver && '(You)'}</p>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Details */}
-          <div className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', color: 'var(--color-medium)' }}>Submitted</span>
-              <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-dark)' }}>{formatDateTime(settlement.createdAt)}</span>
+          <section aria-label="Settlement details" className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+              <span style={{ fontSize: 13, color: 'var(--color-medium)' }}>Submitted</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-dark)', textAlign: 'right' }}>{formatDateTime(settlement.createdAt)}</span>
             </div>
             {settlement.confirmedAt && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: 'var(--color-medium)' }}>Confirmed</span>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-dark)' }}>{formatDateTime(settlement.confirmedAt)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                <span style={{ fontSize: 13, color: 'var(--color-medium)' }}>Confirmed</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-dark)', textAlign: 'right' }}>{formatDateTime(settlement.confirmedAt)}</span>
               </div>
             )}
             {settlement.transactionRef && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--color-medium)', flexShrink: 0 }}>Reference</span>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-dark)', textAlign: 'right', wordBreak: 'break-all' }}>{settlement.transactionRef}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                <span style={{ fontSize: 13, color: 'var(--color-medium)', flexShrink: 0 }}>Reference</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-dark)', textAlign: 'right', wordBreak: 'break-all' }}>{settlement.transactionRef}</span>
               </div>
             )}
-          </div>
+          </section>
 
-          {/* Actions for receiver on pending */}
-          {isReceiver && settlement.status === 'pending_confirmation' && (
+          {settlement.canRespond && settlement.status === 'pending_confirmation' && (
             <>
-              <div style={{ background: 'var(--color-amber-soft)', borderRadius: '14px', padding: '14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <AlertCircle size={18} color="var(--color-amber)" style={{ flexShrink: 0, marginTop: '1px' }} />
-                <p style={{ fontSize: '13px', color: '#92400E', lineHeight: 1.5 }}>
-                  Please confirm only if you actually received this payment. This action cannot be undone.
-                </p>
+              <div style={{ background: 'var(--color-amber-soft)', borderRadius: 14, padding: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <AlertCircle size={18} color="var(--color-amber)" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
+                <p style={{ fontSize: 13, color: '#92400E', lineHeight: 1.5 }}>Confirm only if the money arrived. Reject if it did not. Either choice is final.</p>
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <DangerButton fullWidth loading={loading === 'reject'} disabled={!!loading} onClick={handleReject}>
-                  Reject
-                </DangerButton>
-                <PrimaryButton fullWidth loading={loading === 'confirm'} disabled={!!loading} onClick={handleConfirm}>
-                  <CheckCircle size={16} /> Confirm
-                </PrimaryButton>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <DangerButton type="button" fullWidth disabled={respond.isPending} onClick={() => setPendingAction('reject')}>Reject</DangerButton>
+                <PrimaryButton type="button" fullWidth disabled={respond.isPending} onClick={() => setPendingAction('confirm')}><CheckCircle size={16} aria-hidden="true" /> Confirm</PrimaryButton>
               </div>
             </>
           )}
 
-          {/* Payer waiting state */}
-          {isPayer && settlement.status === 'pending_confirmation' && (
-            <div style={{ background: 'var(--color-amber-soft)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
-              <Clock size={24} color="var(--color-amber)" style={{ margin: '0 auto 8px' }} />
-              <p style={{ fontSize: '14px', fontWeight: 600, color: '#B45309' }}>Waiting for confirmation</p>
-              <p style={{ fontSize: '13px', color: '#92400E', marginTop: '4px' }}>{settlement.receiverName} needs to confirm this payment.</p>
+          {!settlement.canRespond && settlement.status === 'pending_confirmation' && (
+            <div style={{ background: 'var(--color-amber-soft)', borderRadius: 14, padding: 16, textAlign: 'center' }}>
+              <Clock size={24} color="var(--color-amber)" style={{ margin: '0 auto 8px' }} aria-hidden="true" />
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#B45309' }}>{isPayer ? 'Waiting for confirmation' : 'Confirmation pending'}</p>
+              <p style={{ fontSize: 13, color: '#92400E', marginTop: 4 }}>{settlement.receiverName} is the only person who can respond to this claim.</p>
             </div>
           )}
+
+          <Link href={`/groups/${groupId}`} className="btn btn-secondary" style={{ textDecoration: 'none', justifyContent: 'center' }}>Back to Group</Link>
         </div>
       </PageShell>
-      <SuccessOverlay
-        show={success}
-        message={actionDone === 'confirm' ? 'Payment confirmed!' : 'Payment rejected'}
-        onComplete={() => router.push(`/groups/${groupId}`)}
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingAction)}
+        title={pendingAction === 'confirm' ? 'Confirm payment received?' : 'Reject payment claim?'}
+        message={pendingAction === 'confirm'
+          ? `Confirm that you received ${formatMoney(settlement.amount)} from ${settlement.payerName}. This updates group balances and cannot be undone.`
+          : `Reject ${settlement.payerName}'s claim for ${formatMoney(settlement.amount)}. No balances will change.`}
+        confirmLabel={pendingAction === 'confirm' ? 'Confirm Received' : 'Reject Claim'}
+        danger={pendingAction === 'reject'}
+        onConfirm={performAction}
+        onCancel={() => setPendingAction(null)}
+        loading={respond.isPending}
       />
     </>
   );

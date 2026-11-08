@@ -80,8 +80,8 @@ describe('personal finance service', () => {
     expect(result.replayed).toBe(false);
     expect(rpc.mock.calls[0][1]).toMatchObject({
       idempotency_key_param: 'personal-create-001',
-      request_hash_param: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
+    expect(rpc.mock.calls[0][1]).not.toHaveProperty('request_hash_param');
   });
 
   it('maps linked transaction edits to the stable read-only error', async () => {

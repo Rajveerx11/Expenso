@@ -21,7 +21,7 @@ const fontSizes: Record<string, string> = {
 export function MoneyText({ amount, size = 'md', showSign = false, colored = true, compact = false, className = '' }: MoneyTextProps) {
   const sign = moneySign(amount);
   const formatted = formatMoney(amount, compact);
-  const prefix = showSign && sign === 'positive' ? '+' : '';
+  const prefix = sign === 'negative' ? '-' : showSign && sign === 'positive' ? '+' : '';
 
   const colorClass = colored
     ? sign === 'positive' ? 'money-positive'

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enforceAuthRateLimit, rateLimitFingerprint } from './rate-limit';
 import { AppError, mapAuthError } from '@/server/http/errors';
 
@@ -62,6 +62,48 @@ describe('auth rate limiting', () => {
       status: 503,
       retryable: true,
     } satisfies Partial<AppError>);
+  });
+
+  it('uses a bounded local throttle when the RPC is absent outside production', async () => {
+    const client = {
+      rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'Function not found' } }),
+    } as unknown as SupabaseClient;
+    const request = new Request('https://expenso.example/api/v1/auth/login', {
+      headers: { 'x-vercel-forwarded-for': '203.0.113.11' },
+    });
+    const identity = `missing-rpc-${crypto.randomUUID()}@example.com`;
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await expect(enforceAuthRateLimit(client, 'login', identity, request)).resolves.toBeUndefined();
+    }
+    await expect(enforceAuthRateLimit(client, 'login', identity, request)).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      status: 429,
+      retryable: true,
+      retryAfterSeconds: 900,
+    } satisfies Partial<AppError>);
+  });
+
+  it('keeps production fail-closed when the RPC is absent', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const client = {
+      rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'Function not found' } }),
+    } as unknown as SupabaseClient;
+
+    try {
+      await expect(enforceAuthRateLimit(
+        client,
+        'login',
+        'production@example.com',
+        new Request('https://expenso.example/api/v1/auth/login'),
+      )).rejects.toMatchObject({
+        code: 'DEPENDENCY_UNAVAILABLE',
+        status: 503,
+        retryable: true,
+      } satisfies Partial<AppError>);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

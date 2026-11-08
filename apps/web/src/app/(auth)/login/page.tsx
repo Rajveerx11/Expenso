@@ -1,28 +1,90 @@
 'use client';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Eye, EyeOff, Mail, Lock, Globe } from 'lucide-react';
 import { PrimaryButton, OutlineButton } from '@/components/ui/Buttons';
 import { FormField, Input } from '@/components/ui/FormField';
+import { bestEffortDisableCurrentPush } from '@/features/push/cleanup';
+import { api, messageForError, safeRelativePath } from '@/lib/api/client';
 
+const OAUTH_FAILURE_MESSAGE = 'Sign-in confirmation did not finish. Try again, or sign in with your email and password.';
 
-export default function LoginPage() {
+export function oauthCallbackError(code: string | null): string {
+  return code === 'oauth_failed' ? OAUTH_FAILURE_MESSAGE : '';
+}
+
+export function oauthRetryPath(pathname: string, search: string, hash = ''): string {
+  const params = new URLSearchParams(search);
+  params.delete('error');
+  const query = params.toString();
+  return `${pathname}${query ? `?${query}` : ''}${hash}`;
+}
+
+export function OAuthFailureAlert() {
+  return (
+    <div role="alert" style={{ background: 'var(--color-red-soft)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: '10px', padding: '12px', fontSize: '14px', color: 'var(--color-red)', lineHeight: 1.5 }}>
+      {OAUTH_FAILURE_MESSAGE}
+    </div>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [oauthFailureDismissed, setOauthFailureDismissed] = useState(false);
+  const oauthFailure = !oauthFailureDismissed && oauthCallbackError(searchParams.get('error'));
+
+  function clearErrorsForRetry() {
+    setError('');
+    setOauthFailureDismissed(true);
+    if (oauthFailure) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        oauthRetryPath(window.location.pathname, window.location.search, window.location.hash),
+      );
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    clearErrorsForRetry();
     setLoading(true);
-    // TODO: Connect to Supabase auth
-    await new Promise(r => setTimeout(r, 1000));
-    router.push('/dashboard');
-    setLoading(false);
+    try {
+      await bestEffortDisableCurrentPush();
+      await api.auth.login({ email, password });
+      queryClient.clear();
+      const destination = safeRelativePath(new URLSearchParams(window.location.search).get('next'));
+      router.replace(destination);
+      router.refresh();
+    } catch (requestError) {
+      setError(messageForError(requestError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogle() {
+    clearErrorsForRetry();
+    setLoading(true);
+    try {
+      await bestEffortDisableCurrentPush();
+      const next = safeRelativePath(new URLSearchParams(window.location.search).get('next'));
+      const { url } = await api.auth.google(next);
+      queryClient.clear();
+      window.location.assign(url);
+    } catch (requestError) {
+      setError(messageForError(requestError));
+      setLoading(false);
+    }
   }
 
   return (
@@ -61,7 +123,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="btn btn-ghost"
-                style={{ padding: '4px', minHeight: 'auto', color: 'var(--color-medium)' }}
+                style={{ padding: 0, width: 44, height: 44, minHeight: 44, color: 'var(--color-medium)' }}
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
@@ -74,10 +136,11 @@ export default function LoginPage() {
         </FormField>
 
         {error && (
-          <div style={{ background: 'var(--color-red-soft)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: '10px', padding: '12px', fontSize: '14px', color: 'var(--color-red)' }}>
+          <div role="alert" style={{ background: 'var(--color-red-soft)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: '10px', padding: '12px', fontSize: '14px', color: 'var(--color-red)' }}>
             {error}
           </div>
         )}
+        {!error && oauthFailure && <OAuthFailureAlert />}
 
         <PrimaryButton type="submit" fullWidth size="lg" loading={loading} style={{ marginTop: '8px' }}>
           Sign In
@@ -90,7 +153,7 @@ export default function LoginPage() {
           <div style={{ flex: 1, height: '1px', background: 'var(--color-light)' }} />
         </div>
 
-        <OutlineButton type="button" fullWidth icon={<Globe size={18} />} onClick={() => {/* TODO: Google OAuth */}}>
+        <OutlineButton type="button" fullWidth loading={loading} icon={<Globe size={18} />} onClick={handleGoogle}>
           Continue with Google
         </OutlineButton>
       </form>
@@ -101,5 +164,13 @@ export default function LoginPage() {
         <Link href="/signup" style={{ color: 'var(--color-primary-deep)', fontWeight: 600, textDecoration: 'none' }}>Sign up</Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<p role="status" style={{ color: 'var(--color-medium)', fontSize: 14 }}>Loading sign in…</p>}>
+      <LoginForm />
+    </Suspense>
   );
 }

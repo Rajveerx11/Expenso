@@ -1,5 +1,5 @@
 begin;
-select plan(13);
+select plan(15);
 
 insert into auth.users(id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
 values
@@ -12,14 +12,14 @@ set local "request.jwt.claim.sub" = '14000000-0000-0000-0000-000000000001';
 select ok(
     (select transaction_id is not null and not replayed from public.create_personal_expense(
         'Salary', 5000.00, 'Salary', 'income', null, '2026-08-01',
-        'personal-create-key-0001', repeat('a', 64)
+        'personal-create-key-0001'
     )),
     'manual transaction is created atomically'
 );
 select ok(
     (select replayed from public.create_personal_expense(
-        'Salary', 5000.00, 'Salary', 'income', null, '2026-08-01',
-        'personal-create-key-0001', repeat('a', 64)
+        '  Salary  ', 5000.0, 'Salary', 'income', '', '2026-08-01',
+        'personal-create-key-0001'
     )),
     'same idempotency request is replayed'
 );
@@ -31,7 +31,7 @@ select is(
 select throws_ok(
     $$select * from public.create_personal_expense(
         'Different', 1.00, 'Other', 'expense', null, '2026-08-01',
-        'personal-create-key-0001', repeat('b', 64)
+        'personal-create-key-0001'
     )$$,
     '22023', 'IDEMPOTENCY_KEY_REUSED',
     'an idempotency key cannot be reused for a different request'
@@ -50,12 +50,29 @@ select throws_ok(
 );
 select throws_ok(
     $$select * from public.create_personal_expense(
+        'Forged digest', 1.00, 'Other', 'expense', null, '2026-08-01',
+        'personal-create-key-0009', repeat('f', 64)
+    )$$,
+    '42501',
+    'permission denied for function create_personal_expense',
+    'authenticated callers cannot supply their own idempotency digest'
+);
+select throws_ok(
+    $$select * from public.create_personal_expense(
         'Unsupported', 1.00, 'Unsupported category', 'expense', null, '2026-08-01',
-        'personal-create-key-0002', repeat('c', 64)
+        'personal-create-key-0002'
     )$$,
     '22023',
     'Invalid personal expense input',
     'direct RPC calls cannot persist unsupported categories'
+);
+select throws_like(
+    $$select * from public.create_personal_expense(
+        'Not finite', 'NaN'::numeric, 'Other', 'expense', null, '2026-08-01',
+        'personal-create-key-0003'
+    )$$,
+    '%personal_expenses_amount_finite%',
+    'direct RPC calls cannot persist non-finite money'
 );
 
 do $$

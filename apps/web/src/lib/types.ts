@@ -138,6 +138,14 @@ export interface AppNotification {
   createdAt: ISODateTime;
 }
 
+export interface WebPushSubscriptionSummary {
+  id: UUID;
+  expirationTime: number | null;
+  userAgent: string | null;
+  createdAt: ISODateTime;
+  lastSuccessAt: ISODateTime | null;
+}
+
 export interface DashboardData {
   profile: Profile;
   month: string;

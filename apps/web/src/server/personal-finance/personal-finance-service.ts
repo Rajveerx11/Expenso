@@ -1,5 +1,4 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Analytics, DashboardData, PersonalTransaction } from '@/lib/types';
@@ -70,17 +69,6 @@ function mapPersonalError(error: { code?: string; message?: string } | null): Ap
     return new AppError({ code: 'IDEMPOTENCY_KEY_REQUIRED', status: 428, cause: error });
   }
   return mapDataError(error);
-}
-
-function requestHash(input: PersonalTransactionInput): string {
-  return createHash('sha256').update(JSON.stringify({
-    title: input.title,
-    amount: input.amount,
-    category: input.category,
-    type: input.type,
-    note: input.note ?? null,
-    expenseDate: input.expenseDate,
-  })).digest('hex');
 }
 
 function decodeCursor(cursor: string | undefined) {
@@ -154,7 +142,6 @@ export async function createPersonalTransaction(
     note_param: input.note ?? null,
     expense_date_param: input.expenseDate,
     idempotency_key_param: idempotencyKey,
-    request_hash_param: requestHash(input),
   });
   if (error) throw mapPersonalError(error);
   const result = Array.isArray(data) ? data[0] : data;
