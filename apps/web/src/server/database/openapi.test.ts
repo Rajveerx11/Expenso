@@ -80,10 +80,13 @@ describe('foundation OpenAPI contract', () => {
   it('documents persistent notifications and secret-free browser push summaries', () => {
     expect(spec).toContain('/v1/notifications/{notificationId}/read:');
     expect(spec).toContain('/v1/notifications/read-all:');
+    expect(spec).toContain('/v1/push-subscriptions/vapid-public-key:');
     expect(spec).toContain('/v1/push-subscriptions/{subscriptionId}:');
     expect(spec).toContain('/internal/notifications/drain:');
     expect(spec).toContain('/internal/notifications/deliver:');
     expect(spec).toContain('Safe summary. Push endpoint and encryption keys are never returned.');
+    expect(spec).toContain('VapidPublicKeyResponse:');
+    expect(spec).toContain("pattern: '^[A-Za-z0-9_-]{87}$'");
     expect(spec).toContain('cronBearer:');
     expect(spec).toContain('webhookBearer:');
     expect(spec).toContain('SupabaseNotificationInsertWebhook:');

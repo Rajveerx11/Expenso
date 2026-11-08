@@ -33,7 +33,7 @@ export function MemberRow({ member, isCurrentUser, isAdminView, isSoleAdmin, onR
       {canRemove && (
         <button
           className="btn btn-ghost btn-icon"
-          style={{ color: 'var(--color-red)', width: 36, height: 36 }}
+          style={{ color: 'var(--color-red)', width: 44, height: 44 }}
           onClick={() => onRemove?.(member)}
           aria-label={`Remove ${member.fullName}`}
         >

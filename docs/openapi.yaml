@@ -568,6 +568,15 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/ValidationError'}
         '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /v1/push-subscriptions/vapid-public-key:
+    get:
+      operationId: getWebPushVapidPublicKey
+      description: Returns the authenticated browser-safe public VAPID key. The private VAPID key is never exposed.
+      security: [{cookieSession: []}]
+      responses:
+        '200': {description: Browser-safe public VAPID key, content: {application/json: {schema: {$ref: '#/components/schemas/VapidPublicKeyResponse'}}}}
+        '401': {$ref: '#/components/responses/AuthRequired'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
   /v1/push-subscriptions:
     post:
       operationId: upsertWebPushSubscription
@@ -1245,6 +1254,8 @@ components:
         lastSuccessAt: {type: [string, 'null'], format: date-time}
     WebPushSubscriptionResponse:
       allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {$ref: '#/components/schemas/WebPushSubscriptionSummary'}}}]
+    VapidPublicKeyResponse:
+      allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [publicKey], properties: {publicKey: {type: string, minLength: 87, maxLength: 87, pattern: '^[A-Za-z0-9_-]{87}$'}}}}}]
     WebPushSubscriptionDeleteResponse:
       allOf: [{$ref: '#/components/schemas/SuccessEnvelope'}, {type: object, properties: {data: {type: object, additionalProperties: false, required: [disabled, subscriptionId], properties: {disabled: {type: boolean, const: true}, subscriptionId: {type: string, format: uuid}}}}}]
     NotificationWebhookRequest:

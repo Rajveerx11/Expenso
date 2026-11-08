@@ -1,16 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, Users, User } from 'lucide-react';
+import { Bell, Home, Receipt, Users, User } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/dashboard', icon: Home, label: 'Home' },
   { href: '/expenses', icon: Receipt, label: 'Expenses' },
   { href: '/groups', icon: Users, label: 'Groups' },
+  { href: '/notifications', icon: Bell, label: 'Inbox' },
   { href: '/profile', icon: User, label: 'Profile' },
 ];
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -44,8 +45,14 @@ export function MobileBottomNav() {
               borderRadius: '10px',
               background: isActive ? 'var(--color-primary-lightest)' : 'transparent',
               transition: 'all 0.15s ease',
+              position: 'relative',
             }}>
               <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+              {label === 'Inbox' && unreadCount > 0 && (
+                <span aria-label={`${unreadCount} unread notifications`} style={{ position: 'absolute', top: -4, right: -5, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: 'var(--color-red)', color: 'white', fontSize: 9, fontWeight: 700, display: 'grid', placeItems: 'center' }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </div>
             <span style={{ fontSize: '10px', fontWeight: isActive ? 600 : 400, letterSpacing: '0.3px' }}>{label}</span>
           </Link>

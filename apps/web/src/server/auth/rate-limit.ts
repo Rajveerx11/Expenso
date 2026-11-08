@@ -6,6 +6,55 @@ import { AppError } from '@/server/http/errors';
 
 export type AuthRateLimitAction = 'login' | 'signup' | 'google';
 
+interface LocalRateLimitEntry {
+  hitCount: number;
+  windowStartedAt: number;
+}
+
+const LOCAL_RATE_LIMITS = new Map<string, LocalRateLimitEntry>();
+const LOCAL_RATE_LIMIT_MAX_KEYS = 10_000;
+const RATE_LIMITS: Record<AuthRateLimitAction, { hitLimit: number; windowMs: number }> = {
+  login: { hitLimit: 10, windowMs: 15 * 60 * 1_000 },
+  signup: { hitLimit: 5, windowMs: 60 * 60 * 1_000 },
+  google: { hitLimit: 20, windowMs: 15 * 60 * 1_000 },
+};
+
+function isMissingRateLimitRpc(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
+}
+
+function enforceLocalAuthRateLimit(action: AuthRateLimitAction, keyHash: string, now = Date.now()): void {
+  const { hitLimit, windowMs } = RATE_LIMITS[action];
+  const key = `${action}:${keyHash}`;
+  const current = LOCAL_RATE_LIMITS.get(key);
+  const startsNewWindow = !current || current.windowStartedAt <= now - windowMs;
+  const windowStartedAt = startsNewWindow
+    ? now
+    : current.windowStartedAt;
+  const hitCount = startsNewWindow ? 1 : current.hitCount + 1;
+
+  if (!current && LOCAL_RATE_LIMITS.size >= LOCAL_RATE_LIMIT_MAX_KEYS) {
+    for (const [candidateKey, entry] of LOCAL_RATE_LIMITS) {
+      const candidateAction = candidateKey.slice(0, candidateKey.indexOf(':')) as AuthRateLimitAction;
+      if (entry.windowStartedAt <= now - RATE_LIMITS[candidateAction].windowMs) {
+        LOCAL_RATE_LIMITS.delete(candidateKey);
+      }
+    }
+    if (LOCAL_RATE_LIMITS.size >= LOCAL_RATE_LIMIT_MAX_KEYS) {
+      throw new AppError({ code: 'DEPENDENCY_UNAVAILABLE', status: 503, retryable: true });
+    }
+  }
+  LOCAL_RATE_LIMITS.set(key, { hitCount, windowStartedAt });
+  if (hitCount > hitLimit) {
+    throw new AppError({
+      code: 'RATE_LIMITED',
+      status: 429,
+      retryable: true,
+      retryAfterSeconds: Math.max(1, Math.ceil((windowStartedAt + windowMs - now) / 1_000)),
+    });
+  }
+}
+
 function requestAddress(request: Request): string {
   const forwarded = request.headers.get('x-vercel-forwarded-for')
     ?? request.headers.get('x-forwarded-for')
@@ -25,12 +74,17 @@ export async function enforceAuthRateLimit(
   identity: string,
   request: Request,
 ): Promise<void> {
+  const keyHash = rateLimitFingerprint(request, identity);
   const { data, error } = await client.rpc('check_auth_rate_limit', {
     action_param: action,
-    key_hash_param: rateLimitFingerprint(request, identity),
+    key_hash_param: keyHash,
     secret_param: getRateLimitSecret(),
   });
   if (error) {
+    if (process.env.NODE_ENV !== 'production' && isMissingRateLimitRpc(error)) {
+      enforceLocalAuthRateLimit(action, keyHash);
+      return;
+    }
     throw new AppError({
       code: 'DEPENDENCY_UNAVAILABLE',
       status: 503,

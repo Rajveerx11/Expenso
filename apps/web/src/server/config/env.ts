@@ -1,9 +1,11 @@
 import 'server-only';
 import { z } from 'zod';
 
-const urlSchema = z.url().refine((value) => value.startsWith('https://') || value.startsWith('http://localhost:'), {
-  message: 'Expected HTTPS URL or localhost.',
-});
+const urlSchema = z.url().refine((value) => {
+  const url = new URL(value);
+  return url.protocol === 'https:'
+    || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+}, { message: 'Expected HTTPS URL or an HTTP loopback origin.' });
 
 export class ConfigurationError extends Error {
   constructor(message = 'Application configuration is unavailable.') {
@@ -79,11 +81,19 @@ export function getServiceRoleConfig() {
   };
 }
 
-export function getWebPushConfig() {
+export function getVapidPublicKey(): string {
   const publicKey = required('VAPID_PUBLIC_KEY', process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  if (!/^[A-Za-z0-9_-]{87}$/.test(publicKey)) {
+    throw new ConfigurationError('Invalid VAPID public key configuration.');
+  }
+  return publicKey;
+}
+
+export function getWebPushConfig() {
+  const publicKey = getVapidPublicKey();
   const privateKey = required('VAPID_PRIVATE_KEY', process.env.VAPID_PRIVATE_KEY);
   const subject = required('VAPID_SUBJECT', process.env.VAPID_SUBJECT);
-  if (!/^[A-Za-z0-9_-]{87}$/.test(publicKey) || !/^[A-Za-z0-9_-]{43}$/.test(privateKey)) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(privateKey)) {
     throw new ConfigurationError('Invalid VAPID key configuration.');
   }
   if (!/^mailto:[^\s@]+@[^\s@]+$/.test(subject) && !/^https:\/\/[^\s]+$/.test(subject)) {

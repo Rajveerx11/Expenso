@@ -16,7 +16,7 @@ export function MonthYearPicker({ value, onChange }: MonthYearPickerProps) {
         type="button"
         onClick={() => onChange(prevMonth(value))}
         className="btn btn-ghost"
-        style={{ padding: '6px 10px', minHeight: 'auto', borderRadius: 'var(--radius-full)' }}
+        style={{ padding: 0, width: 44, height: 44, minHeight: 44, borderRadius: 'var(--radius-full)' }}
         aria-label="Previous month"
       >
         <ChevronLeft size={16} />
@@ -28,7 +28,7 @@ export function MonthYearPicker({ value, onChange }: MonthYearPickerProps) {
         type="button"
         onClick={() => !isCurrentMonth && onChange(nextMonth(value))}
         className="btn btn-ghost"
-        style={{ padding: '6px 10px', minHeight: 'auto', borderRadius: 'var(--radius-full)', opacity: isCurrentMonth ? 0.3 : 1 }}
+        style={{ padding: 0, width: 44, height: 44, minHeight: 44, borderRadius: 'var(--radius-full)', opacity: isCurrentMonth ? 0.3 : 1 }}
         disabled={isCurrentMonth}
         aria-label="Next month"
       >

@@ -12,7 +12,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "verify:client-secrets": "node scripts/verify-client-secret-boundary.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -35,6 +37,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.62.1",
     "@readme/openapi-parser": "^7.0.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

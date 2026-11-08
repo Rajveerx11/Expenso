@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ============================================================
@@ -7,24 +6,24 @@
 :root {
   /* Primary Indigo Palette */
   --color-primary-deep: #4F46E5;
-  --color-primary-medium: #6366F1;
+  --color-primary-medium: #5B5BD6;
   --color-primary-soft: #818CF8;
   --color-primary-lightest: #EEF2FF;
   --color-primary-container: #C7D2FE;
 
   /* Semantic Colors */
-  --color-green: #10B981;
+  --color-green: #047857;
   --color-green-soft: #D1FAE5;
-  --color-red: #F43F5E;
+  --color-red: #BE123C;
   --color-red-soft: #FFE4E6;
-  --color-amber: #F59E0B;
+  --color-amber: #92400E;
   --color-amber-soft: #FEF3C7;
 
   /* Neutrals */
   --color-white: #FFFFFF;
   --color-snow: #FAFAFA;
   --color-light: #F3F4F6;
-  --color-medium: #9CA3AF;
+  --color-medium: #475569;
   --color-dark: #374151;
   --color-black: #111827;
 
@@ -172,6 +171,12 @@ body {
 
 .pb-nav {
   padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  .pb-nav {
+    padding-bottom: 32px;
+  }
 }
 
 /* ============================================================
@@ -363,7 +368,7 @@ body {
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, #F43F5E, #E11D48);
+  background: linear-gradient(135deg, #BE123C, #9F1239);
   color: white;
   box-shadow: 0 4px 16px rgba(244, 63, 94, 0.3);
 }
@@ -396,7 +401,24 @@ body {
 .btn-sm {
   padding: 8px 16px;
   font-size: 13px;
-  min-height: 36px;
+  min-height: 44px;
+}
+
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -64px;
+  z-index: 1000;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--color-black);
+  color: var(--color-white);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 16px;
 }
 
 .btn-lg {
@@ -469,7 +491,7 @@ body {
 
 .chip-positive {
   background: var(--color-green-soft);
-  color: #059669;
+  color: var(--color-green);
 }
 
 .chip-negative {
@@ -510,6 +532,12 @@ body {
   display: flex;
   align-items: flex-start;
   padding-top: 8px;
+}
+
+@media (min-width: 1024px) {
+  .bottom-nav {
+    display: none;
+  }
 }
 
 /* ============================================================
